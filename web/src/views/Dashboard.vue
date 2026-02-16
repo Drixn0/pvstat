@@ -250,7 +250,7 @@ async function onMonthChange() {
     <!-- 顶部导航（macOS/iOS） -->
     <div class="nav">
       <div class="nav-left">
-        <div class="app-title">{{ monthLabel }}光伏发电量及收益统计</div>
+        <div class="app-title">{{ monthLabel }} 光伏发电量及收益统计</div>
         <div class="app-sub">录入电量自动算每kW与金额</div>
       </div>
 
@@ -304,11 +304,11 @@ async function onMonthChange() {
         </div>
       </div>      
       <div class="summary-card">
-        <div class="summary-label">{{ monthLabel }}累计发电量</div>
+        <div class="summary-label">{{ monthLabel }} 累计发电量</div>
         <div class="summary-value">{{ grandTotalKwh().toFixed(2) }} <span class="unit">kWh</span></div>
       </div>
       <div class="summary-card">
-        <div class="summary-label">{{ monthLabel }}累计发电收益</div>
+        <div class="summary-label">{{ monthLabel }} 累计发电收益</div>
         <div class="summary-value money">¥{{ grandTotalAmount().toFixed(2) }}</div>
       </div>
     </div>
@@ -339,15 +339,15 @@ async function onMonthChange() {
 
         <div class="stats">
           <div class="stat">
-            <div class="stat-label">月总电量</div>
+            <div class="stat-label">{{ monthLabel }} 总发电量</div>
             <div class="stat-value">{{ monthTotalKwh(u).toFixed(2) }} <span class="unit">kWh</span></div>
           </div>
           <div class="stat">
-            <div class="stat-label">1KW发电量</div>
+            <div class="stat-label">每kW发电量</div>
             <div class="stat-value">{{ monthEqHours(u).toFixed(2) }}</div>
           </div>
           <div class="stat">
-            <div class="stat-label">月总金额</div>
+            <div class="stat-label">{{ monthLabel }} 总收益</div>
             <div class="stat-value money">¥{{ monthTotalAmount(u).toFixed(2) }}</div>
           </div>
         </div>

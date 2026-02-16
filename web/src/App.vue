@@ -24,7 +24,7 @@
         <div class="title-pill">
           <div class="title-left">
             <div class="title-text">太阳能光伏发电统计系统</div>
-            <div class="title-sub">财务统计版 · 自动计算电量 / 每kW / 金额</div>
+            <div class="title-sub">自动计算电量 / 每kW / 金额</div>
           </div>
 
           <!-- 监控小组件 -->
