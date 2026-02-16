@@ -250,8 +250,8 @@ async function onMonthChange() {
     <!-- 顶部导航（macOS/iOS） -->
     <div class="nav">
       <div class="nav-left">
-        <div class="app-title">光伏发电统计</div>
-        <div class="app-sub">卡片视图 · 录入电量自动算每kW与金额</div>
+        <div class="app-title">{{ monthLabel }}光伏发电量及收益统计</div>
+        <div class="app-sub">录入电量自动算每kW与金额</div>
       </div>
 
       <div class="nav-right">
@@ -304,11 +304,11 @@ async function onMonthChange() {
         </div>
       </div>      
       <div class="summary-card">
-        <div class="summary-label">月累计发电量</div>
+        <div class="summary-label">{{ monthLabel }}累计发电量</div>
         <div class="summary-value">{{ grandTotalKwh().toFixed(2) }} <span class="unit">kWh</span></div>
       </div>
       <div class="summary-card">
-        <div class="summary-label">月累计发电金额</div>
+        <div class="summary-label">{{ monthLabel }}累计发电收益</div>
         <div class="summary-value money">¥{{ grandTotalAmount().toFixed(2) }}</div>
       </div>
     </div>
@@ -437,7 +437,15 @@ async function onMonthChange() {
           <div class="dialog-title">新增用户</div>
           <button class="dialog-close" @click="dialogVisible = false">完成</button>
         </div>
-      </template>
+      
+  <!-- ===== Footer Card ===== -->
+  <div class="footer-card">
+    <div class="footer-content">
+      DESIGNED BY 大白白
+    </div>
+  </div>
+
+</template>
 
       <div class="form-ios">
         <div class="form-row">
@@ -469,7 +477,15 @@ async function onMonthChange() {
           <div class="dialog-title">编辑用户</div>
           <button class="dialog-close" @click="editDialogVisible = false">完成</button>
         </div>
-      </template>
+      
+  <!-- ===== Footer Card ===== -->
+  <div class="footer-card">
+    <div class="footer-content">
+      DESIGNED BY 大白白
+    </div>
+  </div>
+
+</template>
 
       <div class="form-ios">
         <div class="form-row">
@@ -494,6 +510,14 @@ async function onMonthChange() {
       </div>
     </el-dialog>
   </div>
+
+  <!-- ===== Footer Card ===== -->
+  <div class="footer-card">
+    <div class="footer-content">
+      DESIGNED BY 大白白
+    </div>
+  </div>
+
 </template>
 
 <style scoped>
@@ -955,6 +979,31 @@ async function onMonthChange() {
   .card-head{ flex-wrap: wrap; align-items:flex-start; }
   .meta{ flex-wrap: wrap; }
   .card-actions{ width: 100%; justify-content: flex-end; }
+}
+
+
+/* ===== Centered Footer Card ===== */
+.footer-card{
+  margin: 60px auto 40px;
+  max-width: 1400px;
+  padding: 28px 20px;
+  border-radius: 22px;
+  text-align: center;
+
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  box-shadow:
+    0 20px 60px rgba(0,0,0,0.06),
+    inset 0 1px 0 rgba(255,255,255,0.9);
+}
+
+.footer-content{
+  font-size: 14px;
+  letter-spacing: 2px;
+  font-weight: 600;
+  color: rgba(0,0,0,0.65);
 }
 
 </style>
