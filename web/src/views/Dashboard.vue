@@ -437,13 +437,6 @@ async function onMonthChange() {
           <div class="dialog-title">新增用户</div>
           <button class="dialog-close" @click="dialogVisible = false">完成</button>
         </div>
-      
-  <!-- ===== Footer Card ===== -->
-  <div class="footer-card">
-    <div class="footer-content">
-      DESIGNED BY 大白白
-    </div>
-  </div>
 
 </template>
 
