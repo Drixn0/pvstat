@@ -1,0 +1,25 @@
+services:
+  server:
+    build:
+      context: ./server
+    container_name: pvstat-server
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_PATH: /data/pv.db
+    volumes:
+      - pvstat-data:/data
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+    container_name: pvstat-web
+    depends_on:
+      - server
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  pvstat-data:

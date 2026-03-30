@@ -82,6 +82,47 @@ npm run dev
 - `/api` -> `http://localhost:3000`
 - `/health` -> `http://localhost:3000`
 
+## Docker 部署
+
+项目现在已经支持 Docker Compose 一键部署。
+
+### 构建并启动
+
+```bash
+docker compose up -d --build
+```
+
+启动后访问：
+
+- 前端页面: `http://localhost:8080`
+- 后端健康检查: `http://localhost:8080/health`
+
+### 停止服务
+
+```bash
+docker compose down
+```
+
+### 数据持久化
+
+SQLite 数据已挂载到 Docker volume：
+
+- `pvstat-data`
+
+容器重建后，数据库内容会保留。
+
+### 生产部署结构
+
+- `web` 容器：使用 `nginx` 提供静态页面，并代理 `/api` 与 `/health`
+- `server` 容器：运行 Express + SQLite 服务
+
+### 相关文件
+
+- [docker-compose.yml](/Users/drixn/Dev/pvstat/docker-compose.yml)
+- [server/Dockerfile](/Users/drixn/Dev/pvstat/server/Dockerfile)
+- [web/Dockerfile](/Users/drixn/Dev/pvstat/web/Dockerfile)
+- [web/nginx.conf](/Users/drixn/Dev/pvstat/web/nginx.conf)
+
 ## 构建与预览
 
 前端生产构建：
@@ -154,6 +195,7 @@ npm test
 - 修正了 `vite.config.js` 中重复的 `build` 配置覆盖问题
 - Element Plus 从全量注册改成了按需引入
 - 移除了未使用依赖 `xlsx`、`file-saver`
+- 增加了 Docker 与 Docker Compose 部署支持
 
 ### 2. 后端稳定性
 

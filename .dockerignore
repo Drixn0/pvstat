@@ -1,0 +1,8 @@
+.git
+.DS_Store
+node_modules
+web/node_modules
+server/node_modules
+web/dist
+server/pv.db
+npm-debug.log*
