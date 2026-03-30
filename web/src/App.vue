@@ -1,5 +1,6 @@
 <template>
-  <div class="app-wrapper">
+  <el-config-provider :locale="zhCn">
+    <div class="app-wrapper">
     <!-- Apple Keynote（浅色发布会风）Header + 企业级监控小组件（移动端优化） -->
     <header class="keynote-header light">
       <div class="space-bg"></div>
@@ -120,14 +121,17 @@
       </div>
     </header>
 
-    <main class="app-main">
-      <router-view />
-    </main>
-  </div>
+      <main class="app-main">
+        <router-view />
+      </main>
+    </div>
+  </el-config-provider>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ElConfigProvider } from 'element-plus'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
 
 // const API_BASE = 'http://localhost:3000'
 const API_BASE = ''

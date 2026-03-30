@@ -3,7 +3,6 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
-
   server: {
     port: 5173,
     proxy: {
@@ -18,16 +17,15 @@ export default defineConfig({
       }
     }
   },
-
   build: {
     outDir: 'dist',
     sourcemap: false,
     minify: 'esbuild',
-
-  rollupOptions: {
-    output: {
-      manualChunks(id) {
-        if (id.includes('node_modules')) {
+    chunkSizeWarningLimit: 900,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
           if (id.includes('element-plus')) return 'element-plus'
           if (id.includes('@element-plus/icons-vue')) return 'ep-icons'
           if (id.includes('axios')) return 'axios'
@@ -37,9 +35,5 @@ export default defineConfig({
         }
       }
     }
-  },
-  build: {
-    chunkSizeWarningLimit: 900
-  }
   }
 })

@@ -1,4 +1,36 @@
 <script setup>
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
+import axios from 'axios'
+import dayjs from 'dayjs'
+import {
+  ElButton,
+  ElDatePicker,
+  ElDialog,
+  ElIcon,
+  ElInput,
+  ElInputNumber,
+  ElMessage,
+  ElMessageBox,
+  ElOption,
+  ElSelect
+} from 'element-plus'
+import { Edit, Delete, Plus, Calendar, Aim } from '@element-plus/icons-vue'
+
+// const API = 'http://localhost:3000'
+const API = '/api'
+const households = ref([])
+const month = ref(dayjs().format('YYYY-MM'))
+const pageLoading = ref(false)
+const monthLoading = ref(false)
+const loadError = ref('')
+const creatingUser = ref(false)
+const updatingUser = ref(false)
+const deletingUserId = ref(null)
+const savingCells = reactive({})
+
+const isPageBusy = computed(() => {
+  return pageLoading.value || monthLoading.value
+})
 
 // ===== 用户总功率合计 =====
 const totalCapacityKw = computed(() => {
@@ -6,18 +38,6 @@ const totalCapacityKw = computed(() => {
     return sum + Number(h.capacity_kw || 0)
   }, 0)
 })
-
-
-import { ref, onMounted, computed, nextTick } from 'vue'
-import axios from 'axios'
-import dayjs from 'dayjs'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Edit, Delete, Plus, Calendar, Aim } from '@element-plus/icons-vue'
-
-// const API = 'http://localhost:3000'
-const API = '/api'
-const households = ref([])
-const month = ref(dayjs().format('YYYY-MM'))
 
 // dialogs
 const dialogVisible = ref(false)
@@ -87,13 +107,43 @@ function goToday() {
 }
 
 onMounted(async () => {
-  await loadAll()
-  goToday()
+  await initializePage()
 })
+
+function getErrorMessage(error, fallback = '操作失败，请稍后重试') {
+  return error?.response?.data?.error || error?.message || fallback
+}
+
+function markCellSaving(userId, day, saving) {
+  const key = `${userId}-${day}`
+  if (saving) {
+    savingCells[key] = true
+    return
+  }
+  delete savingCells[key]
+}
+
+function isCellSaving(userId, day) {
+  return Boolean(savingCells[`${userId}-${day}`])
+}
+
+async function initializePage() {
+  pageLoading.value = true
+  loadError.value = ''
+  try {
+    await loadAll()
+    goToday()
+  } catch (error) {
+    loadError.value = getErrorMessage(error, '页面初始化失败，请刷新后重试')
+    ElMessage.error(loadError.value)
+  } finally {
+    pageLoading.value = false
+  }
+}
 
 async function loadAll() {
   const hRes = await axios.get(`${API}/households`)
-  households.value = hRes.data.map(h => ({
+  households.value = hRes.data.map((h) => ({
     ...h,
     days: {}
   }))
@@ -102,10 +152,15 @@ async function loadAll() {
 
 async function loadGeneration() {
   const gRes = await axios.get(`${API}/generation`, { params: { month: month.value } })
-  households.value.forEach(u => (u.days = {}))
+  const usersById = new Map()
+  households.value.forEach((u) => {
+    u.days = {}
+    usersById.set(u.id, u)
+  })
+
   gRes.data.forEach(g => {
     const day = g.date.slice(8, 10)
-    const user = households.value.find(u => u.id === g.household_id)
+    const user = usersById.get(g.household_id)
     if (user) user.days[day] = Number(g.kwh) || 0
   })
 }
@@ -113,11 +168,19 @@ async function loadGeneration() {
 async function saveKwh(userId, day, value) {
   const date = `${month.value}-${day}`
   const kwh = Number(value)
-  await axios.post(`${API}/generation`, {
-    household_id: userId,
-    date,
-    kwh: Number.isFinite(kwh) ? kwh : 0
-  })
+  markCellSaving(userId, day, true)
+  try {
+    await axios.post(`${API}/generation`, {
+      household_id: userId,
+      date,
+      kwh: Number.isFinite(kwh) ? kwh : 0
+    })
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '保存电量失败'))
+    throw error
+  } finally {
+    markCellSaving(userId, day, false)
+  }
 }
 
 // ====== 计算（按户、按天）======
@@ -133,35 +196,100 @@ function getAmount(u, day) {
   const price = Number(u.price_per_kwh) || 0
   return getKwh(u, day) * price
 }
-function monthTotalKwh(u) {
-  return Object.values(u.days || {}).reduce((a, b) => a + (Number(b) || 0), 0)
-}
-function monthTotalAmount(u) {
-  const price = Number(u.price_per_kwh) || 0
-  return monthTotalKwh(u) * price
-}
-function monthEqHours(u) {
-  const cap = Number(u.capacity_kw) || 0
-  if (!cap) return 0
-  return monthTotalKwh(u) / cap
+const userStatsById = computed(() => {
+  const stats = new Map()
+  households.value.forEach((u) => {
+    const monthTotalKwh = Object.values(u.days || {}).reduce((sum, value) => {
+      return sum + (Number(value) || 0)
+    }, 0)
+    const price = Number(u.price_per_kwh) || 0
+    const cap = Number(u.capacity_kw) || 0
+
+    stats.set(u.id, {
+      monthTotalKwh,
+      monthTotalAmount: monthTotalKwh * price,
+      monthEqHours: cap ? monthTotalKwh / cap : 0
+    })
+  })
+  return stats
+})
+
+const dailyTotals = computed(() => {
+  const totals = new Map()
+  daysInMonth.value.forEach((day) => {
+    totals.set(day, { kwh: 0, amount: 0 })
+  })
+
+  households.value.forEach((u) => {
+    const price = Number(u.price_per_kwh) || 0
+    daysInMonth.value.forEach((day) => {
+      const kwh = Number(u.days?.[day]) || 0
+      const current = totals.get(day)
+      current.kwh += kwh
+      current.amount += kwh * price
+    })
+  })
+
+  return totals
+})
+
+const grandTotals = computed(() => {
+  let kwh = 0
+  let amount = 0
+
+  userStatsById.value.forEach((stat) => {
+    kwh += stat.monthTotalKwh
+    amount += stat.monthTotalAmount
+  })
+
+  return { kwh, amount }
+})
+
+const hasHouseholds = computed(() => households.value.length > 0)
+const hasGenerationData = computed(() => grandTotals.value.kwh > 0)
+
+function summaryDisplay(value, unit, emptyText) {
+  if (!hasHouseholds.value) {
+    return { text: '等待创建', unit: emptyText }
+  }
+
+  if (!hasGenerationData.value && value === 0) {
+    return { text: '待录入', unit: emptyText }
+  }
+
+  return { text: Number(value).toFixed(2), unit }
 }
 
-// ====== 全体合计 ======
-function dayTotalKwh(dayStr) {
-  return households.value.reduce((s, u) => s + (Number(u.days?.[dayStr]) || 0), 0)
+const summaryMonthKwh = computed(() => {
+  return summaryDisplay(grandTotals.value.kwh, 'kWh', '先新增用户')
+})
+
+const summaryMonthAmount = computed(() => {
+  if (!hasHouseholds.value) {
+    return { text: '等待创建', prefix: '', unit: '先新增用户' }
+  }
+
+  if (!hasGenerationData.value) {
+    return { text: '待录入', prefix: '', unit: '录入后生成' }
+  }
+
+  return {
+    text: grandTotals.value.amount.toFixed(2),
+    prefix: '¥',
+    unit: '当月收益'
+  }
+})
+
+function getUserStats(userId) {
+  return userStatsById.value.get(userId) || {
+    monthTotalKwh: 0,
+    monthTotalAmount: 0,
+    monthEqHours: 0
+  }
 }
-function dayTotalAmount(dayStr) {
-  return households.value.reduce((s, u) => {
-    const kwh = Number(u.days?.[dayStr]) || 0
-    const price = Number(u.price_per_kwh) || 0
-    return s + kwh * price
-  }, 0)
-}
-function grandTotalKwh() {
-  return households.value.reduce((s, u) => s + monthTotalKwh(u), 0)
-}
-function grandTotalAmount() {
-  return households.value.reduce((s, u) => s + monthTotalAmount(u), 0)
+
+function getDailyTotals(dayStr) {
+  return dailyTotals.value.get(dayStr) || { kwh: 0, amount: 0 }
 }
 
 const monthLabel = computed(() => {
@@ -195,11 +323,18 @@ function cardStyleByUser(user) {
 // ====== 用户管理 ======
 async function addUser() {
   if (!newUser.value.name?.trim()) return ElMessage.warning('请输入户名')
-  await axios.post(`${API}/households`, newUser.value)
-  ElMessage.success('新增成功')
-  dialogVisible.value = false
-  newUser.value = { name: '', capacity_kw: 10, price_per_kwh: 0.98 }
-  await loadAll()
+  creatingUser.value = true
+  try {
+    await axios.post(`${API}/households`, newUser.value)
+    ElMessage.success('新增成功')
+    dialogVisible.value = false
+    newUser.value = { name: '', capacity_kw: 10, price_per_kwh: 0.98 }
+    await loadAll()
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '新增用户失败'))
+  } finally {
+    creatingUser.value = false
+  }
 }
 
 function openEdit(user) {
@@ -214,17 +349,36 @@ function openEdit(user) {
 
 async function saveEdit() {
   if (!editUser.value.name?.trim()) return ElMessage.warning('请输入户名')
-  await axios.put(`${API}/households/${editUser.value.id}`, editUser.value)
-  ElMessage.success('修改成功')
-  editDialogVisible.value = false
-  await loadAll()
+  updatingUser.value = true
+  try {
+    await axios.put(`${API}/households/${editUser.value.id}`, editUser.value)
+    ElMessage.success('修改成功')
+    editDialogVisible.value = false
+    await loadAll()
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '修改用户失败'))
+  } finally {
+    updatingUser.value = false
+  }
 }
 
 async function deleteUser(user) {
-  await ElMessageBox.confirm(`确定删除用户【${user.name}】？`, '提示', { type: 'warning' })
-  await axios.delete(`${API}/households/${user.id}`)
-  ElMessage.success('删除成功')
-  await loadAll()
+  try {
+    await ElMessageBox.confirm(`确定删除用户【${user.name}】？`, '提示', { type: 'warning' })
+  } catch {
+    return
+  }
+
+  deletingUserId.value = user.id
+  try {
+    await axios.delete(`${API}/households/${user.id}`)
+    ElMessage.success('删除成功')
+    await loadAll()
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '删除用户失败'))
+  } finally {
+    deletingUserId.value = null
+  }
 }
 
 // 纯输入：字符串转数字
@@ -240,13 +394,29 @@ function fmtZero(v, digits = 2) {
 }
 
 async function onMonthChange() {
-  await loadAll()
-  goToday()
+  monthLoading.value = true
+  loadError.value = ''
+  try {
+    await loadAll()
+    goToday()
+  } catch (error) {
+    loadError.value = getErrorMessage(error, '切换月份失败')
+    ElMessage.error(loadError.value)
+  } finally {
+    monthLoading.value = false
+  }
 }
 </script>
 
 <template>
   <div class="page">
+    <div v-if="isPageBusy" class="page-mask">
+      <div class="page-mask-card">
+        <div class="page-mask-title">{{ pageLoading ? '正在加载数据' : '正在切换月份' }}</div>
+        <div class="page-mask-sub">请稍候，正在同步最新的用户与发电数据。</div>
+      </div>
+    </div>
+
     <!-- 顶部导航（macOS/iOS） -->
     <div class="nav">
       <div class="nav-left">
@@ -263,6 +433,7 @@ async function onMonthChange() {
             format="M月"
             value-format="YYYY-MM"
             :clearable="false"
+            :disabled="isPageBusy"
             @change="onMonthChange"
             class="ios-picker"
           />
@@ -271,20 +442,25 @@ async function onMonthChange() {
         <div class="jump">
           <div class="label"><el-icon><Aim /></el-icon> 跳到</div>
           <div class="jump-row">
-            <el-select v-model="jumpDay" class="ios-select" @change="scrollAllToDay">
+            <el-select v-model="jumpDay" class="ios-select" :disabled="isPageBusy" @change="scrollAllToDay">
               <el-option v-for="d in daysInMonth" :key="'opt-' + d" :label="Number(d) + '日'" :value="d" />
             </el-select>
 
-            <el-button class="ios-btn" @click="scrollAllToDay(jumpDay)">跳转</el-button>
-            <el-button class="ios-btn ios-btn-primary" @click="goToday">今日</el-button>
+            <el-button class="ios-btn" :disabled="isPageBusy" @click="scrollAllToDay(jumpDay)">跳转</el-button>
+            <el-button class="ios-btn ios-btn-primary" :disabled="isPageBusy" @click="goToday">今日</el-button>
           </div>
         </div>
 
-        <el-button class="ios-btn ios-btn-primary" @click="dialogVisible = true">
+        <el-button class="ios-btn ios-btn-primary" :disabled="isPageBusy" @click="dialogVisible = true">
           <el-icon><Plus /></el-icon>
           新增用户
         </el-button>
       </div>
+    </div>
+
+    <div v-if="loadError" class="error-banner">
+      <div class="error-title">数据加载遇到问题</div>
+      <div class="error-text">{{ loadError }}</div>
     </div>
 
     <!-- 总览（iOS小组件风） -->
@@ -305,16 +481,60 @@ async function onMonthChange() {
       </div>      
       <div class="summary-card">
         <div class="summary-label">{{ monthLabel }} 累计发电量</div>
-        <div class="summary-value">{{ grandTotalKwh().toFixed(2) }} <span class="unit">kWh</span></div>
+        <div class="summary-value">
+          {{ summaryMonthKwh.text }} <span class="unit">{{ summaryMonthKwh.unit }}</span>
+        </div>
       </div>
       <div class="summary-card">
         <div class="summary-label">{{ monthLabel }} 累计发电收益</div>
-        <div class="summary-value money">¥{{ grandTotalAmount().toFixed(2) }}</div>
+        <div class="summary-value money">
+          {{ summaryMonthAmount.prefix }}{{ summaryMonthAmount.text }}
+          <span class="unit">{{ summaryMonthAmount.unit }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="!hasHouseholds && !isPageBusy" class="empty-state">
+      <div class="empty-visual solar">
+        <div class="sun-core"></div>
+        <div class="sun-ring"></div>
+        <div class="panel-grid">
+          <span></span>
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+      <div class="empty-title">还没有用户数据</div>
+      <div class="empty-text">先新增一个用户，系统就会开始记录每日电量、自动计算每kW发电量和收益。</div>
+      <div class="empty-actions">
+        <el-button class="ios-btn ios-btn-primary" @click="dialogVisible = true">
+          <el-icon><Plus /></el-icon>
+          立即新增用户
+        </el-button>
+      </div>
+    </div>
+
+    <div v-else-if="!hasGenerationData && !isPageBusy" class="empty-state month-empty">
+      <div class="empty-visual timeline">
+        <div class="timeline-dot"></div>
+        <div class="timeline-line"></div>
+        <div class="timeline-cards">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+      <div class="empty-title">{{ monthLabel }} 还没有录入发电数据</div>
+      <div class="empty-text">用户已经准备好了，现在只需要在下方卡片里录入每天电量，本月合计和收益会自动生成。</div>
+      <div class="empty-actions">
+        <el-button class="ios-btn" @click="scrollAllToDay('01')">跳到 1 日</el-button>
+        <el-button class="ios-btn ios-btn-primary" @click="goToday">定位今日</el-button>
       </div>
     </div>
 
     <!-- 用户卡片 -->
-    <div class="grid">
+    <div v-else class="grid">
       <div v-for="u in households" :key="u.id" class="user-card" :style="cardStyleByUser(u)">
         <div class="card-head">
           <div class="who">
@@ -326,13 +546,13 @@ async function onMonthChange() {
           </div>
 
           <div class="card-actions">
-            <button class="icon-pill" @click="openEdit(u)" title="编辑">
+            <button class="icon-pill" :disabled="isPageBusy || deletingUserId === u.id" @click="openEdit(u)" title="编辑">
               <el-icon><Edit /></el-icon>
               编辑
             </button>
-            <button class="icon-pill danger" @click="deleteUser(u)" title="删除">
+            <button class="icon-pill danger" :disabled="isPageBusy || deletingUserId === u.id" @click="deleteUser(u)" title="删除">
               <el-icon><Delete /></el-icon>
-              删除
+              {{ deletingUserId === u.id ? '删除中...' : '删除' }}
             </button>
           </div>
         </div>
@@ -340,15 +560,15 @@ async function onMonthChange() {
         <div class="stats">
           <div class="stat">
             <div class="stat-label">{{ monthLabel }} 总发电量</div>
-            <div class="stat-value">{{ monthTotalKwh(u).toFixed(2) }} <span class="unit">kWh</span></div>
+            <div class="stat-value">{{ getUserStats(u.id).monthTotalKwh.toFixed(2) }} <span class="unit">kWh</span></div>
           </div>
           <div class="stat">
             <div class="stat-label">每kW发电量</div>
-            <div class="stat-value">{{ monthEqHours(u).toFixed(2) }}</div>
+            <div class="stat-value">{{ getUserStats(u.id).monthEqHours.toFixed(2) }}</div>
           </div>
           <div class="stat">
             <div class="stat-label">{{ monthLabel }} 总收益</div>
-            <div class="stat-value money">¥{{ monthTotalAmount(u).toFixed(2) }}</div>
+            <div class="stat-value money">¥{{ getUserStats(u.id).monthTotalAmount.toFixed(2) }}</div>
           </div>
         </div>
 
@@ -370,6 +590,7 @@ async function onMonthChange() {
                 class="cell-input"
                 inputmode="decimal"
                 placeholder="0"
+                :disabled="isPageBusy || isCellSaving(u.id, d)"
                 @blur="
                   () => {
                     normalizeNumberInput(u, d)
@@ -384,7 +605,7 @@ async function onMonthChange() {
                 "
               />
 
-              <div class="cell-text">{{ getPerKw(u, d).toFixed(3) }}</div>
+              <div class="cell-text">{{ isCellSaving(u.id, d) ? '保存中...' : getPerKw(u, d).toFixed(3) }}</div>
               <div class="cell-text money">¥{{ getAmount(u, d).toFixed(2) }}</div>
             </div>
           </div>
@@ -395,7 +616,7 @@ async function onMonthChange() {
     </div>
 
     <!-- 合计卡片 -->
-    <div class="total-card">
+    <div v-if="hasHouseholds" class="total-card">
       <div class="total-head">
         <div>
           <div class="total-title">合计</div>
@@ -404,11 +625,11 @@ async function onMonthChange() {
         <div class="total-right">
           <div class="total-kpi">
             <div class="kpi-label">月总电量</div>
-            <div class="kpi-value">{{ grandTotalKwh().toFixed(2) }} <span class="unit">kWh</span></div>
+            <div class="kpi-value">{{ grandTotals.kwh.toFixed(2) }} <span class="unit">kWh</span></div>
           </div>
           <div class="total-kpi">
             <div class="kpi-label">月总金额</div>
-            <div class="kpi-value money">¥{{ grandTotalAmount().toFixed(2) }}</div>
+            <div class="kpi-value money">¥{{ grandTotals.amount.toFixed(2) }}</div>
           </div>
         </div>
       </div>
@@ -423,8 +644,8 @@ async function onMonthChange() {
         <div class="day-scroll" :ref="el => setScrollRef('TOTAL', el)">
           <div class="day-col" v-for="d in daysInMonth" :key="'TOTAL-' + d">
             <div class="day-title">{{ Number(d) }}</div>
-            <div class="cell-text strong">{{ dayTotalKwh(d).toFixed(2) }}</div>
-            <div class="cell-text money strong">¥{{ dayTotalAmount(d).toFixed(2) }}</div>
+            <div class="cell-text strong">{{ getDailyTotals(d).kwh.toFixed(2) }}</div>
+            <div class="cell-text money strong">¥{{ getDailyTotals(d).amount.toFixed(2) }}</div>
           </div>
         </div>
       </div>
@@ -437,28 +658,27 @@ async function onMonthChange() {
           <div class="dialog-title">新增用户</div>
           <button class="dialog-close" @click="dialogVisible = false">完成</button>
         </div>
-
-</template>
+      </template>
 
       <div class="form-ios">
         <div class="form-row">
           <div class="form-label">户名</div>
-          <el-input v-model="newUser.name" class="ios-input" placeholder="例如：张三" />
+          <el-input v-model="newUser.name" class="ios-input" :disabled="creatingUser" placeholder="例如：张三" />
         </div>
 
         <div class="form-row">
           <div class="form-label">功率(kW)</div>
-          <el-input-number v-model="newUser.capacity_kw" :min="0" controls-position="right" class="ios-number" />
+          <el-input-number v-model="newUser.capacity_kw" :min="0" :disabled="creatingUser" controls-position="right" class="ios-number" />
         </div>
 
         <div class="form-row">
           <div class="form-label">电价(元/度)</div>
-          <el-input-number v-model="newUser.price_per_kwh" :min="0" :step="0.01" :precision="2" controls-position="right" class="ios-number" />
+          <el-input-number v-model="newUser.price_per_kwh" :min="0" :step="0.01" :precision="2" :disabled="creatingUser" controls-position="right" class="ios-number" />
         </div>
 
         <div class="form-actions">
-          <el-button class="ios-btn" @click="dialogVisible=false">取消</el-button>
-          <el-button class="ios-btn ios-btn-primary" @click="addUser">保存</el-button>
+          <el-button class="ios-btn" :disabled="creatingUser" @click="dialogVisible=false">取消</el-button>
+          <el-button class="ios-btn ios-btn-primary" :loading="creatingUser" @click="addUser">保存</el-button>
         </div>
       </div>
     </el-dialog>
@@ -470,47 +690,37 @@ async function onMonthChange() {
           <div class="dialog-title">编辑用户</div>
           <button class="dialog-close" @click="editDialogVisible = false">完成</button>
         </div>
-      
-  <!-- ===== Footer Card ===== -->
-  <div class="footer-card">
-    <div class="footer-content">
-      DESIGNED BY 大白白
-    </div>
-  </div>
-
-</template>
+      </template>
 
       <div class="form-ios">
         <div class="form-row">
           <div class="form-label">户名</div>
-          <el-input v-model="editUser.name" class="ios-input" />
+          <el-input v-model="editUser.name" class="ios-input" :disabled="updatingUser" />
         </div>
 
         <div class="form-row">
           <div class="form-label">功率(kW)</div>
-          <el-input-number v-model="editUser.capacity_kw" :min="0" controls-position="right" class="ios-number" />
+          <el-input-number v-model="editUser.capacity_kw" :min="0" :disabled="updatingUser" controls-position="right" class="ios-number" />
         </div>
 
         <div class="form-row">
           <div class="form-label">电价(元/度)</div>
-          <el-input-number v-model="editUser.price_per_kwh" :min="0" :step="0.01" :precision="2" controls-position="right" class="ios-number" />
+          <el-input-number v-model="editUser.price_per_kwh" :min="0" :step="0.01" :precision="2" :disabled="updatingUser" controls-position="right" class="ios-number" />
         </div>
 
         <div class="form-actions">
-          <el-button class="ios-btn" @click="editDialogVisible=false">取消</el-button>
-          <el-button class="ios-btn ios-btn-primary" @click="saveEdit">保存</el-button>
+          <el-button class="ios-btn" :disabled="updatingUser" @click="editDialogVisible=false">取消</el-button>
+          <el-button class="ios-btn ios-btn-primary" :loading="updatingUser" @click="saveEdit">保存</el-button>
         </div>
       </div>
     </el-dialog>
-  </div>
 
-  <!-- ===== Footer Card ===== -->
-  <div class="footer-card">
-    <div class="footer-content">
-      DESIGNED BY 大白白
+    <div class="footer-card">
+      <div class="footer-content">
+        DESIGNED BY 大白白
+      </div>
     </div>
   </div>
-
 </template>
 
 <style scoped>
@@ -521,6 +731,60 @@ async function onMonthChange() {
   background: radial-gradient(1200px 600px at 20% 0%, #eef2ff 0%, transparent 60%),
               radial-gradient(900px 500px at 90% 20%, #fdf2f8 0%, transparent 55%),
               #f6f7fb;
+  position: relative;
+}
+
+.page-mask{
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(246, 247, 251, .55);
+  backdrop-filter: blur(6px);
+}
+
+.page-mask-card{
+  width: min(360px, calc(100vw - 32px));
+  padding: 18px 20px;
+  border-radius: 20px;
+  background: rgba(255,255,255,.86);
+  border: 1px solid rgba(15,23,42,.08);
+  box-shadow: 0 18px 50px rgba(15,23,42,.14);
+}
+
+.page-mask-title{
+  font-size: 16px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.page-mask-sub{
+  margin-top: 6px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.error-banner{
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(254, 242, 242, .88);
+  border: 1px solid rgba(220, 38, 38, .14);
+  box-shadow: 0 10px 24px rgba(220, 38, 38, .08);
+}
+
+.error-title{
+  font-size: 14px;
+  font-weight: 900;
+  color: #991b1b;
+}
+
+.error-text{
+  margin-top: 4px;
+  font-size: 12px;
+  color: #b91c1c;
 }
 
 /* 顶部导航 */
@@ -606,6 +870,146 @@ async function onMonthChange() {
 }
 .summary-value.money{ color:#d33; }
 .unit{ font-size: 12px; color:#64748b; font-weight:700; margin-left:4px; }
+
+.empty-state{
+  margin: 14px 0;
+  padding: 34px 24px;
+  border-radius: 24px;
+  background:
+    radial-gradient(600px 240px at 15% 0%, rgba(59,130,246,.12), transparent 60%),
+    radial-gradient(520px 240px at 85% 10%, rgba(236,72,153,.10), transparent 58%),
+    rgba(255,255,255,.78);
+  border: 1px solid rgba(15,23,42,.08);
+  box-shadow: 0 18px 50px rgba(15,23,42,.10);
+  text-align: center;
+}
+
+.empty-visual{
+  position: relative;
+  margin: 0 auto 18px;
+}
+
+.empty-title{
+  font-size: 22px;
+  font-weight: 950;
+  color: #0f172a;
+}
+
+.empty-text{
+  width: min(560px, 100%);
+  margin: 10px auto 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #64748b;
+}
+
+.empty-actions{
+  margin-top: 18px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.empty-visual.solar{
+  width: 170px;
+  height: 110px;
+}
+
+.sun-core{
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff7cc 0%, #fbbf24 55%, #f59e0b 100%);
+  box-shadow: 0 0 30px rgba(251,191,36,.35);
+}
+
+.sun-ring{
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  width: 68px;
+  height: 68px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  border: 2px solid rgba(251,191,36,.25);
+}
+
+.panel-grid{
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  width: 120px;
+  height: 48px;
+  transform: translateX(-50%) perspective(120px) rotateX(38deg);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(59,130,246,.92), rgba(37,99,235,.96));
+  box-shadow: 0 14px 26px rgba(37,99,235,.22);
+  overflow: hidden;
+}
+
+.panel-grid span{
+  position: absolute;
+  inset: 0;
+  border-top: 1px solid rgba(255,255,255,.22);
+  border-left: 1px solid rgba(255,255,255,.18);
+}
+
+.panel-grid span:nth-child(1){ transform: translateX(25%); }
+.panel-grid span:nth-child(2){ transform: translateX(50%); }
+.panel-grid span:nth-child(3){ transform: translateY(33%); }
+.panel-grid span:nth-child(4){ transform: translateY(66%); }
+
+.empty-visual.timeline{
+  width: 200px;
+  height: 92px;
+}
+
+.timeline-dot{
+  position: absolute;
+  left: 24px;
+  top: 8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22c55e, #14b8a6);
+  box-shadow: 0 0 0 8px rgba(20,184,166,.10);
+}
+
+.timeline-line{
+  position: absolute;
+  left: 31px;
+  top: 24px;
+  width: 2px;
+  height: 52px;
+  background: linear-gradient(180deg, rgba(20,184,166,.45), rgba(59,130,246,.12));
+}
+
+.timeline-cards{
+  position: absolute;
+  left: 58px;
+  right: 0;
+  top: 2px;
+  display: grid;
+  gap: 10px;
+}
+
+.timeline-cards span{
+  display: block;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255,255,255,.85), rgba(191,219,254,.92));
+  border: 1px solid rgba(59,130,246,.10);
+  box-shadow: 0 10px 20px rgba(15,23,42,.05);
+}
+
+.timeline-cards span:nth-child(1){ width: 116px; }
+.timeline-cards span:nth-child(2){ width: 88px; }
+.timeline-cards span:nth-child(3){ width: 136px; }
 
 /* 用户卡片 */
 .grid{ display:flex; flex-direction: column; gap: 12px; }
@@ -701,6 +1105,11 @@ async function onMonthChange() {
   box-shadow: none;
   cursor: pointer;
   transition: transform .15s ease, background .15s ease;
+}
+.icon-pill:disabled{
+  opacity: .6;
+  cursor: not-allowed;
+  transform: none;
 }
 .icon-pill:hover{ transform: translateY(-1px); transition: .15s; }
 .icon-pill.danger{
@@ -972,6 +1381,8 @@ async function onMonthChange() {
   .card-head{ flex-wrap: wrap; align-items:flex-start; }
   .meta{ flex-wrap: wrap; }
   .card-actions{ width: 100%; justify-content: flex-end; }
+  .empty-state{ padding: 28px 18px; }
+  .empty-title{ font-size: 18px; }
 }
 
 
