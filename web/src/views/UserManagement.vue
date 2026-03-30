@@ -928,13 +928,13 @@ onMounted(() => {
 }
 
 .trend-chart{
-  margin-top: 18px;
+  margin-top: 14px;
   display:grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(68px, 1fr);
-  gap: 12px;
+  grid-auto-columns: minmax(88px, 1fr);
+  gap: 16px;
   align-items:end;
-  min-height: 220px;
+  min-height: 198px;
   overflow-x: auto;
 }
 
@@ -942,28 +942,31 @@ onMounted(() => {
   display:flex;
   flex-direction:column;
   align-items:center;
-  gap: 8px;
+  gap: 5px;
 }
 
 .trend-value{
-  font-size: 12px;
-  font-weight: 900;
-  color:#334155;
+  font-size: 15px;
+  font-weight: 950;
+  color:#1e293b;
+  line-height: 1;
+  letter-spacing: .2px;
 }
 
 .trend-bar-rail{
-  width: 100%;
-  height: 150px;
+  width: 64px;
+  height: 138px;
   display:flex;
   align-items:flex-end;
-  padding: 8px;
-  border-radius: 20px;
+  justify-content:center;
+  padding: 8px 0;
+  border-radius: 999px;
   background: linear-gradient(180deg, rgba(219,234,254,.55), rgba(248,250,252,.9));
   border: 1px solid rgba(15,23,42,.06);
 }
 
 .trend-bar-fill{
-  width: 100%;
+  width: 40px;
   min-height: 8px;
   border-radius: 999px;
   background: linear-gradient(180deg, #60a5fa 0%, #4f46e5 100%);
@@ -971,9 +974,12 @@ onMounted(() => {
 }
 
 .trend-label{
-  font-size: 12px;
-  font-weight: 900;
-  color:#64748b;
+  margin-top: 1px;
+  font-size: 14px;
+  font-weight: 950;
+  color:#475569;
+  line-height: 1;
+  letter-spacing: .3px;
 }
 
 .history-row{
