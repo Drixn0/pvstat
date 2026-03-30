@@ -10,6 +10,7 @@ const props = defineProps({
   userStyle: { type: Object, required: true },
   isPageBusy: { type: Boolean, default: false },
   deleting: { type: Boolean, default: false },
+  canManage: { type: Boolean, default: false },
   getUserStats: { type: Function, required: true },
   getPerKw: { type: Function, required: true },
   getAmount: { type: Function, required: true },
@@ -17,7 +18,8 @@ const props = defineProps({
   isCellSaving: { type: Function, required: true },
   normalizeNumberInput: { type: Function, required: true },
   saveKwh: { type: Function, required: true },
-  setScrollRef: { type: Function, required: true }
+  setScrollRef: { type: Function, required: true },
+  requestAuth: { type: Function, required: true }
 })
 
 defineEmits(['edit', 'delete'])
@@ -31,6 +33,7 @@ function setInputRef(day, instance) {
 }
 
 async function handleBlur(day) {
+  if (!props.canManage) return
   const key = `${props.user.id}-${day}`
   if (skipBlurKey === key) {
     skipBlurKey = ''
@@ -41,6 +44,10 @@ async function handleBlur(day) {
 }
 
 async function handleEnter(day) {
+  if (!props.canManage) {
+    props.requestAuth('登录后才能录入发电数据')
+    return
+  }
   const key = `${props.user.id}-${day}`
   skipBlurKey = key
   props.normalizeNumberInput(props.user, day)
@@ -69,11 +76,11 @@ async function handleEnter(day) {
       </div>
 
       <div class="card-actions">
-        <button class="icon-pill" :disabled="isPageBusy || deleting" title="编辑" @click="$emit('edit', user)">
+        <button class="icon-pill" :disabled="isPageBusy || deleting" :title="canManage ? '编辑' : '登录后才能编辑'" @click="canManage ? $emit('edit', user) : requestAuth('登录后才能编辑用户')">
           <el-icon><Edit /></el-icon>
           编辑
         </button>
-        <button class="icon-pill danger" :disabled="isPageBusy || deleting" title="删除" @click="$emit('delete', user)">
+        <button class="icon-pill danger" :disabled="isPageBusy || deleting" :title="canManage ? '删除' : '登录后才能删除'" @click="canManage ? $emit('delete', user) : requestAuth('登录后才能删除用户')">
           <el-icon><Delete /></el-icon>
           {{ deleting ? '删除中...' : '删除' }}
         </button>
@@ -114,7 +121,9 @@ async function handleEnter(day) {
             class="cell-input"
             inputmode="decimal"
             placeholder="0"
+            :readonly="!canManage"
             :disabled="isPageBusy || isCellSaving(user.id, d)"
+            @focus="!canManage ? requestAuth('登录后才能录入发电数据') : null"
             @blur="handleBlur(d)"
             @keydown.enter.prevent="handleEnter(d)"
           />

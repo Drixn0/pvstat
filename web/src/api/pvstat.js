@@ -48,3 +48,8 @@ export async function upsertGeneration(payload) {
   const { data } = await apiClient.post('/generation', payload)
   return data
 }
+
+export async function fetchAuditLogs(params) {
+  const { data } = await apiClient.get('/audit-logs', { params })
+  return data
+}

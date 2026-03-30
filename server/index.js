@@ -168,9 +168,23 @@ export function initSchema(db) {
     UNIQUE(household_id, date)
   );
 
+  CREATE TABLE IF NOT EXISTS audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    username TEXT NOT NULL,
+    action TEXT NOT NULL,
+    target_type TEXT,
+    target_id TEXT,
+    summary TEXT NOT NULL,
+    status TEXT NOT NULL,
+    client_ip TEXT
+  );
+
   CREATE INDEX IF NOT EXISTS idx_households_name ON households(name COLLATE NOCASE);
   CREATE INDEX IF NOT EXISTS idx_generation_date ON generation(date);
   CREATE INDEX IF NOT EXISTS idx_generation_household_date ON generation(household_id, date);
+  CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action, created_at DESC);
   `)
 }
 
@@ -294,6 +308,42 @@ export function createApp(options = {}) {
     GROUP BY day
     ORDER BY day ASC
   `)
+  const insertAuditLogStmt = db.prepare(`
+    INSERT INTO audit_logs (
+      created_at,
+      username,
+      action,
+      target_type,
+      target_id,
+      summary,
+      status,
+      client_ip
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+  const countAuditLogsStmt = db.prepare(`
+    SELECT COUNT(*) AS total
+    FROM audit_logs
+    WHERE (? = '' OR action = ?)
+      AND (? = '' OR summary LIKE ? OR username LIKE ?)
+  `)
+  const listAuditLogsStmt = db.prepare(`
+    SELECT
+      id,
+      created_at,
+      username,
+      action,
+      target_type,
+      target_id,
+      summary,
+      status,
+      client_ip
+    FROM audit_logs
+    WHERE (? = '' OR action = ?)
+      AND (? = '' OR summary LIKE ? OR username LIKE ?)
+    ORDER BY created_at DESC, id DESC
+    LIMIT ? OFFSET ?
+  `)
 
   const deleteHouseholdCascade = db.transaction((householdId) => {
     return deleteHouseholdStmt.run(householdId)
@@ -339,6 +389,19 @@ export function createApp(options = {}) {
     }
   }
 
+  function parseAuditLogQuery(query) {
+    const page = Math.max(1, Number(query.page || 1) || 1)
+    const pageSize = Math.min(100, Math.max(1, Number(query.page_size || 20) || 20))
+    const action = String(query.action || '').trim().toUpperCase()
+    const keyword = String(query.keyword || '').trim()
+    return {
+      page,
+      pageSize,
+      action,
+      keyword
+    }
+  }
+
   function requireAuth(req, res, next) {
     const authHeader = String(req.headers.authorization || '')
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
@@ -371,6 +434,31 @@ export function createApp(options = {}) {
         expiresAt
       }
     }
+  }
+
+  function getClientIp(req) {
+    const socketAddress = req?.socket?.remoteAddress || req?.connection?.remoteAddress || ''
+    const forwardedFor = req?.headers?.['x-forwarded-for'] || ''
+    let ip = ''
+    try {
+      ip = typeof req?.ip === 'string' ? req.ip : ''
+    } catch {
+      ip = ''
+    }
+    return String(ip || forwardedFor || socketAddress || '')
+  }
+
+  function writeAuditLog(req, payload) {
+    insertAuditLogStmt.run(
+      new Date().toISOString(),
+      payload.username,
+      payload.action,
+      payload.targetType || '',
+      payload.targetId == null ? '' : String(payload.targetId),
+      payload.summary,
+      payload.status || 'success',
+      getClientIp(req)
+    )
   }
 
   app.get('/health', route((req, res) => {
@@ -436,8 +524,23 @@ export function createApp(options = {}) {
   app.post('/auth/login', route((req, res) => {
     const payload = parseLoginPayload(req.body)
     if (payload.username !== adminUsername || payload.password !== adminPassword) {
+      writeAuditLog(req, {
+        username: payload.username,
+        action: 'LOGIN',
+        targetType: 'auth',
+        targetId: payload.username,
+        summary: `登录失败：${payload.username}`,
+        status: 'failed'
+      })
       throw new HttpError(401, '用户名或密码错误')
     }
+    writeAuditLog(req, {
+      username: payload.username,
+      action: 'LOGIN',
+      targetType: 'auth',
+      targetId: payload.username,
+      summary: `登录成功：${payload.username}`
+    })
     res.json({
       success: true,
       ...issueLoginResponse(payload.username)
@@ -462,6 +565,13 @@ export function createApp(options = {}) {
       payload.capacityKw,
       payload.pricePerKwh
     )
+    writeAuditLog(req, {
+      username: req.auth.username,
+      action: 'HOUSEHOLD_CREATE',
+      targetType: 'household',
+      targetId: result.lastInsertRowid,
+      summary: `新增用户：${payload.name}`
+    })
     res.status(201).json({ success: true, id: result.lastInsertRowid })
   }))
 
@@ -474,12 +584,26 @@ export function createApp(options = {}) {
       payload.pricePerKwh,
       householdId
     )
+    writeAuditLog(req, {
+      username: req.auth.username,
+      action: 'HOUSEHOLD_UPDATE',
+      targetType: 'household',
+      targetId: householdId,
+      summary: `编辑用户：${payload.name}`
+    })
     res.json({ success: true })
   }))
 
   app.post('/households/batch-delete', requireAuth, route((req, res) => {
     const ids = parseBatchDeletePayload(req.body)
     deleteHouseholdsBatch(ids)
+    writeAuditLog(req, {
+      username: req.auth.username,
+      action: 'HOUSEHOLD_BATCH_DELETE',
+      targetType: 'household',
+      targetId: ids.join(','),
+      summary: `批量删除用户 ${ids.length} 个`
+    })
     res.json({
       success: true,
       deletedCount: ids.length
@@ -493,6 +617,13 @@ export function createApp(options = {}) {
       payload.date,
       payload.kwh
     )
+    writeAuditLog(req, {
+      username: req.auth.username,
+      action: 'GENERATION_UPSERT',
+      targetType: 'generation',
+      targetId: `${payload.householdId}:${payload.date}`,
+      summary: `录入发电量：用户 ${payload.householdId} ${payload.date} ${payload.kwh} kWh`
+    })
     res.json({ success: true })
   }))
 
@@ -569,9 +700,46 @@ export function createApp(options = {}) {
     })
   }))
 
+  app.get('/audit-logs', requireAuth, route((req, res) => {
+    const query = parseAuditLogQuery(req.query)
+    const keywordLike = query.keyword ? `%${query.keyword}%` : ''
+    const total = Number(countAuditLogsStmt.get(
+      query.action,
+      query.action,
+      query.keyword,
+      keywordLike,
+      keywordLike
+    ).total) || 0
+    const rows = listAuditLogsStmt.all(
+      query.action,
+      query.action,
+      query.keyword,
+      keywordLike,
+      keywordLike,
+      query.pageSize,
+      (query.page - 1) * query.pageSize
+    )
+
+    res.json({
+      success: true,
+      items: rows,
+      page: query.page,
+      pageSize: query.pageSize,
+      total
+    })
+  }))
+
   app.delete('/households/:id', requireAuth, route((req, res) => {
     const householdId = requireExistingHousehold(req.params.id)
+    const household = householdByIdStmt.get(householdId)
     deleteHouseholdCascade(householdId)
+    writeAuditLog(req, {
+      username: req.auth.username,
+      action: 'HOUSEHOLD_DELETE',
+      targetType: 'household',
+      targetId: householdId,
+      summary: `删除用户：${household?.name || householdId}`
+    })
     res.json({ success: true })
   }))
 

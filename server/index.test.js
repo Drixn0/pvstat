@@ -73,6 +73,8 @@ test('schema creates indexes for household and generation lookups', async () => 
     `).all().map((row) => row.name)
 
     assert.deepEqual(indexes, [
+      'idx_audit_logs_action',
+      'idx_audit_logs_created_at',
       'idx_generation_date',
       'idx_generation_household_date',
       'idx_households_name',
@@ -176,6 +178,85 @@ test('protected write endpoints require login', async () => {
 
     assert.equal(res.statusCode, 401)
     assert.match(res.body.error, /未登录|登录/)
+  } finally {
+    svc.close()
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+})
+
+test('login returns token and auth/me returns current user', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvstat-test-'))
+  const dbPath = path.join(tmpDir, 'test.db')
+  const svc = createApp({ dbPath })
+
+  try {
+    const loginRes = await invokeApp(svc.app, {
+      method: 'POST',
+      url: '/auth/login',
+      headers: { 'content-type': 'application/json' },
+      body: { username: 'admin', password: 'changeme123' }
+    })
+
+    assert.equal(loginRes.statusCode, 200)
+    assert.ok(loginRes.body.token)
+    assert.equal(loginRes.body.user.username, 'admin')
+
+    const meRes = await invokeApp(svc.app, {
+      method: 'GET',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${loginRes.body.token}` }
+    })
+
+    assert.equal(meRes.statusCode, 200)
+    assert.equal(meRes.body.user.username, 'admin')
+    assert.ok(meRes.body.user.expiresAt > Date.now())
+  } finally {
+    svc.close()
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+})
+
+test('audit logs record login and write operations', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvstat-test-'))
+  const dbPath = path.join(tmpDir, 'test.db')
+  const svc = createApp({ dbPath })
+
+  try {
+    const loginRes = await invokeApp(svc.app, {
+      method: 'POST',
+      url: '/auth/login',
+      headers: { 'content-type': 'application/json' },
+      body: { username: 'admin', password: 'changeme123' }
+    })
+    const token = loginRes.body.token
+
+    const createRes = await invokeApp(svc.app, {
+      method: 'POST',
+      url: '/households',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`
+      },
+      body: {
+        name: '审计样例用户',
+        capacity_kw: 8.8,
+        price_per_kwh: 0.66
+      }
+    })
+
+    assert.equal(createRes.statusCode, 201)
+
+    const logsRes = await invokeApp(svc.app, {
+      method: 'GET',
+      url: '/audit-logs?page=1&page_size=10',
+      headers: { authorization: `Bearer ${token}` }
+    })
+
+    assert.equal(logsRes.statusCode, 200)
+    assert.equal(logsRes.body.total, 2)
+    assert.equal(logsRes.body.items[0].action, 'HOUSEHOLD_CREATE')
+    assert.equal(logsRes.body.items[0].status, 'success')
+    assert.equal(logsRes.body.items[1].action, 'LOGIN')
   } finally {
     svc.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })

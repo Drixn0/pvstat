@@ -15,6 +15,8 @@
 - 支持按月份录入每日电量
 - 自动计算每户月总发电量、每 kW 发电量、收益
 - 支持总计卡片按日汇总所有用户
+- 支持管理员登录后新增、修改、删除和录入数据
+- 支持查看管理员操作日志，追踪关键写操作与登录记录
 - 前端包含服务健康状态监控小组件
 - 后端使用 SQLite 持久化数据
 
@@ -123,6 +125,10 @@ SQLite 数据已挂载到 Docker volume：
 - `JSON_BODY_LIMIT`: JSON 请求体大小限制，默认 `256kb`
 - `DB_BUSY_TIMEOUT_MS`: SQLite 锁等待时间，默认 `5000`
 - `DB_JOURNAL_MODE`: SQLite 日志模式，默认 `WAL`
+- `ADMIN_USERNAME`: 管理员用户名，默认 `admin`
+- `ADMIN_PASSWORD`: 管理员密码，默认 `changeme123`
+- `AUTH_SECRET`: 登录 token 签名密钥，生产环境务必改成随机长字符串
+- `AUTH_TOKEN_TTL_HOURS`: 登录有效时长，默认 `24`
 
 参考示例：
 
@@ -173,6 +179,9 @@ npm test
 - 月份格式校验
 - 日期格式校验
 - 删除用户时发电数据级联删除
+- 写接口登录保护
+- 登录态查询与审计日志记录
+- 月度汇总接口聚合逻辑
 
 ## 数据存储
 
@@ -184,6 +193,7 @@ npm test
 
 - `households`: 用户基础信息
 - `generation`: 每户每日发电量
+- `audit_logs`: 管理员登录和关键写操作审计日志
 
 `generation.household_id` 已启用外键约束，并配置了 `ON DELETE CASCADE`。
 
@@ -192,12 +202,23 @@ npm test
 后端核心接口如下：
 
 - `GET /health`: 服务健康检查
+- `POST /auth/login`: 管理员登录
+- `GET /auth/me`: 获取当前登录用户
 - `GET /households`: 获取用户列表
 - `POST /households`: 新增用户
 - `PUT /households/:id`: 编辑用户
 - `DELETE /households/:id`: 删除用户
+- `POST /households/batch-delete`: 批量删除用户
 - `GET /generation?month=YYYY-MM`: 获取当月发电数据
+- `GET /generation/summary?month=YYYY-MM`: 获取当月汇总统计
 - `POST /generation`: 新增或更新某一天的发电量
+- `GET /audit-logs`: 分页查询操作日志（需登录）
+
+说明：
+
+- 查询类接口默认允许未登录访问
+- 新增、修改、删除、录入类接口需要管理员登录
+- 前端未登录时会进入只读模式
 
 接口错误返回已统一为 JSON 结构：
 
@@ -224,6 +245,7 @@ npm test
 - 增加了未知路由和非法 JSON 的友好返回
 - 删除用户时联动清理发电数据
 - `/health` 版本号与项目版本保持一致
+- 新增审计日志表和关键写操作日志记录
 
 ### 3. 前端性能与可维护性
 
@@ -237,6 +259,8 @@ npm test
 - 增加了接口失败时的统一错误提示
 - 增加了空状态和无数据状态视觉引导
 - 总览卡片在空状态下使用更自然的提示文案，而不是直接显示 `0.00`
+- 未登录时前端进入只读模式
+- 新增“操作日志”页面，支持筛选、搜索和分页查看
 
 ## 后续建议
 

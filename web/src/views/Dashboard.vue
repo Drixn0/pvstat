@@ -11,9 +11,14 @@ import DashboardHeader from '../components/DashboardHeader.vue'
 import DashboardTotalCard from '../components/DashboardTotalCard.vue'
 import HouseholdCard from '../components/HouseholdCard.vue'
 import UserFormDialog from '../components/UserFormDialog.vue'
+import { useAuth } from '../composables/useAuth'
 
 const route = useRoute()
 const router = useRouter()
+const {
+  isAuthenticated,
+  openLoginDialog
+} = useAuth()
 const households = ref([])
 const monthlySummary = ref(null)
 const month = ref(String(route.query.month || dayjs().format('YYYY-MM')))
@@ -124,6 +129,25 @@ const {
   message: ElMessage,
   messageBox: ElMessageBox
 })
+
+function requestManageAuth(message = '登录后才能修改数据') {
+  openLoginDialog(message)
+}
+
+function openCreateGuarded() {
+  if (!isAuthenticated.value) return requestManageAuth('登录后才能新增用户')
+  openCreateDialog()
+}
+
+function openEditGuarded(user) {
+  if (!isAuthenticated.value) return requestManageAuth('登录后才能编辑用户')
+  openEdit(user)
+}
+
+function removeUserGuarded(user) {
+  if (!isAuthenticated.value) return requestManageAuth('登录后才能删除用户')
+  removeUser(user)
+}
 
 function markCellSaving(userId, day, saving) {
   const key = `${userId}-${day}`
@@ -331,6 +355,7 @@ function exportMonthlyDetails() {
       :days-in-month="daysInMonth"
       :is-page-busy="isPageBusy"
       :loading="isInitialLoading"
+      :can-manage="isAuthenticated"
       :households-count="households.length"
       :total-capacity-kw="totalCapacityKw"
       :summary-month-kwh="summaryMonthKwh"
@@ -339,8 +364,14 @@ function exportMonthlyDetails() {
       @jump="scrollAllToDay"
       @today="goToday"
       @export="exportMonthlyDetails"
-      @create="openCreateDialog"
+      @create="openCreateGuarded"
     />
+
+    <div v-if="!isAuthenticated" class="readonly-banner">
+      <div class="readonly-title">当前为只读模式</div>
+      <div class="readonly-text">未登录时可以查看统计和导出明细，但不能新增、修改、删除或录入发电数据。</div>
+      <button class="readonly-btn" @click="requestManageAuth('登录后才能新增、修改、删除和录入数据')">管理员登录</button>
+    </div>
 
     <div v-if="isInitialLoading" class="dashboard-skeleton-list">
       <div class="dashboard-skeleton-card" v-for="idx in 2" :key="`dashboard-skeleton-${idx}`">
@@ -399,6 +430,7 @@ function exportMonthlyDetails() {
         :user-style="cardStyleByUser(u)"
         :is-page-busy="isPageBusy"
         :deleting="deletingUserId === u.id"
+        :can-manage="isAuthenticated"
         :get-user-stats="getUserStats"
         :get-per-kw="getPerKw"
         :get-amount="getAmount"
@@ -407,8 +439,9 @@ function exportMonthlyDetails() {
         :normalize-number-input="normalizeNumberInput"
         :save-kwh="saveKwh"
         :set-scroll-ref="setScrollRef"
-        @edit="openEdit"
-        @delete="removeUser"
+        :request-auth="requestManageAuth"
+        @edit="openEditGuarded"
+        @delete="removeUserGuarded"
       />
     </div>
 
@@ -510,6 +543,41 @@ function exportMonthlyDetails() {
   margin-top: 4px;
   font-size: 12px;
   color: #b91c1c;
+}
+
+.readonly-banner{
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(254,249,195,.72);
+  border: 1px solid rgba(234,179,8,.22);
+  box-shadow: 0 10px 24px rgba(234,179,8,.08);
+}
+
+.readonly-title{
+  font-size: 14px;
+  font-weight: 900;
+  color:#854d0e;
+}
+
+.readonly-text{
+  margin-top: 4px;
+  font-size: 13px;
+  color:#713f12;
+}
+
+.readonly-btn{
+  margin-top: 10px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+  color:#fff;
+  background: linear-gradient(135deg, #d97706 0%, #ea580c 100%);
+  box-shadow: 0 10px 24px rgba(234,88,12,.18);
 }
 
 .grid{ display:flex; flex-direction: column; gap: 12px; }

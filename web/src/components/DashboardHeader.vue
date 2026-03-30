@@ -27,6 +27,10 @@ defineProps({
     type: Boolean,
     default: false
   },
+  canManage: {
+    type: Boolean,
+    default: false
+  },
   householdsCount: {
     type: Number,
     required: true
@@ -97,7 +101,7 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 
         <el-button class="ios-btn ios-btn-primary" :disabled="isPageBusy || loading" @click="$emit('create')">
           <el-icon><Plus /></el-icon>
-          新增用户
+          {{ canManage ? '新增用户' : '登录后新增' }}
         </el-button>
       </div>
     </div>

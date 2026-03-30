@@ -33,6 +33,9 @@
               <router-link class="nav-link" :class="{ active: route.name === 'users' }" to="/users">
                 用户管理
               </router-link>
+              <router-link class="nav-link" :class="{ active: route.name === 'audit-logs' }" to="/audit-logs">
+                操作日志
+              </router-link>
             </nav>
             <div class="auth-row">
               <div class="auth-status" :class="{ active: isAuthenticated }">

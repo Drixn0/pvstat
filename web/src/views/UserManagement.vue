@@ -5,9 +5,14 @@ import { ElDialog, ElMessage, ElMessageBox } from 'element-plus'
 import { deleteHouseholdsBatch, fetchHouseholdHistorySummary, fetchHouseholds } from '../api/pvstat'
 import UserFormDialog from '../components/UserFormDialog.vue'
 import { useHouseholdManagement } from '../composables/useHouseholdManagement'
+import { useAuth } from '../composables/useAuth'
 
 const route = useRoute()
 const router = useRouter()
+const {
+  isAuthenticated,
+  openLoginDialog
+} = useAuth()
 const households = ref([])
 const loading = ref(false)
 const loadError = ref('')
@@ -77,6 +82,30 @@ const {
   message: ElMessage,
   messageBox: ElMessageBox
 })
+
+function requestManageAuth(message = '登录后才能修改用户数据') {
+  openLoginDialog(message)
+}
+
+function openCreateGuarded() {
+  if (!isAuthenticated.value) return requestManageAuth('登录后才能新增用户')
+  openCreateDialog()
+}
+
+function openEditGuarded(user) {
+  if (!isAuthenticated.value) return requestManageAuth('登录后才能编辑用户')
+  openEdit(user)
+}
+
+async function removeSelectedUsersGuarded() {
+  if (!isAuthenticated.value) return requestManageAuth('登录后才能批量删除用户')
+  await removeSelectedUsers()
+}
+
+function removeSingleUserGuarded(user) {
+  if (!isAuthenticated.value) return requestManageAuth('登录后才能删除用户')
+  removeUser(user)
+}
 
 const filteredHouseholds = computed(() => {
   const q = keyword.value.trim().toLowerCase()
@@ -292,11 +321,21 @@ watch([keyword, sortKey, pageSize, currentPage], async () => {
         <button class="ghost-btn" :disabled="loading || !sortedHouseholds.length" @click="exportHouseholds">
           导出清单
         </button>
-        <button class="danger-btn" :disabled="loading || bulkDeleting || !selectedIds.length" @click="removeSelectedUsers">
+        <button class="danger-btn" :disabled="loading || bulkDeleting || !selectedIds.length" @click="removeSelectedUsersGuarded">
           {{ bulkDeleting ? '删除中...' : `批量删除${selectedIds.length ? `(${selectedIds.length})` : ''}` }}
         </button>
-        <button class="primary-btn" :disabled="loading" @click="openCreateDialog">新增用户</button>
+        <button class="primary-btn" :disabled="loading" @click="openCreateGuarded">
+          {{ isAuthenticated ? '新增用户' : '登录后新增' }}
+        </button>
       </div>
+    </section>
+
+    <section v-if="!isAuthenticated" class="readonly-card">
+      <div>
+        <div class="readonly-title">当前为只读模式</div>
+        <div class="readonly-text">未登录时可以查看用户列表、搜索、排序、导出和历史汇总，但不能新增、编辑或删除用户。</div>
+      </div>
+      <button class="primary-btn compact" @click="requestManageAuth('登录后才能新增、编辑和删除用户')">管理员登录</button>
     </section>
 
     <section class="summary">
@@ -353,7 +392,7 @@ watch([keyword, sortKey, pageSize, currentPage], async () => {
     <section v-if="!households.length && !loading" class="empty-card">
       <div class="empty-title">还没有用户档案</div>
       <div class="empty-text">先创建用户资料，后续每个月都直接复用这些用户录入电量，不需要重复新增。</div>
-      <button class="primary-btn" @click="openCreateDialog">立即新增用户</button>
+      <button class="primary-btn" @click="openCreateGuarded">{{ isAuthenticated ? '立即新增用户' : '登录后新增用户' }}</button>
     </section>
 
     <template v-else-if="!sortedHouseholds.length && !loading">
@@ -408,13 +447,13 @@ watch([keyword, sortKey, pageSize, currentPage], async () => {
 
             <div class="user-actions">
               <button class="ghost-btn compact" :disabled="loading" @click="openHistory(user)">历史汇总</button>
-              <button class="ghost-btn compact" :disabled="loading || deletingUserId === user.id" @click="openEdit(user)">
+              <button class="ghost-btn compact" :disabled="loading || deletingUserId === user.id" @click="openEditGuarded(user)">
                 编辑
               </button>
               <button
                 class="danger-btn compact"
                 :disabled="loading || deletingUserId === user.id"
-                @click="removeUser(user)"
+                @click="removeSingleUserGuarded(user)"
               >
                 {{ deletingUserId === user.id ? '删除中...' : '删除' }}
               </button>
@@ -728,6 +767,32 @@ watch([keyword, sortKey, pageSize, currentPage], async () => {
   justify-content:space-between;
   gap: 14px;
   flex-wrap: wrap;
+}
+
+.readonly-card{
+  margin-top: 16px;
+  padding: 16px 18px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  border-radius: 20px;
+  background: rgba(254,249,195,.72);
+  border: 1px solid rgba(234,179,8,.22);
+  box-shadow: 0 10px 24px rgba(234,179,8,.08);
+}
+
+.readonly-title{
+  font-size: 14px;
+  font-weight: 900;
+  color:#854d0e;
+}
+
+.readonly-text{
+  margin-top: 4px;
+  font-size: 13px;
+  color:#713f12;
 }
 
 .toolbar-meta{
