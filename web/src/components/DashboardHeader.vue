@@ -135,7 +135,7 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
             <div class="hero-note">本月累计总输出</div>
           </div>
           <div v-if="loading" class="summary-skeleton hero-skeleton"></div>
-          <div v-else class="hero-value">
+          <div v-else class="hero-value kwh">
             {{ summaryMonthKwh.text }} <span class="unit">{{ summaryMonthKwh.unit }}</span>
           </div>
         </div>
@@ -176,7 +176,7 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 }
 
 .app-title{
-  font-size: 22px;
+  font-size: 23px;
   font-weight: 900;
   color: #0f172a;
   letter-spacing: .2px;
@@ -184,7 +184,7 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 
 .app-sub{
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 13px;
   color: #64748b;
 }
 
@@ -219,7 +219,7 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
   display:flex;
   align-items:center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 12px;
   color: #64748b;
   margin-bottom: 3px;
 }
@@ -296,6 +296,11 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
   overflow: hidden;
 }
 
+.summary-side .summary-card{
+  background: rgba(250,252,255,.68);
+  border-color: rgba(184,198,226,.22);
+}
+
 .summary-card.accent{
   background: linear-gradient(135deg, rgba(237,242,255,.95), rgba(248,250,255,.86));
 }
@@ -334,7 +339,7 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
   background: linear-gradient(90deg, rgba(239,68,68,.28), rgba(239,68,68,0));
 }
 
-.summary-label{ font-size: 11px; color: #64748b; }
+.summary-label{ font-size: 12px; color: #71819b; }
 
 .hero-meta{
   display:flex;
@@ -344,28 +349,32 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 }
 
 .hero-note{
-  font-size: 10px;
+  font-size: 11px;
   color:#7b89a3;
   white-space: nowrap;
 }
 
 .summary-value{
   margin-top: 4px;
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 900;
-  color: #0f172a;
+  color: #1e2d47;
   line-height: 1.1;
 }
 
 .summary-value.money{ color:#d33; }
-.unit{ font-size: 11px; color:#64748b; font-weight:700; margin-left:4px; }
+.unit{ font-size: 12px; color:#64748b; font-weight:700; margin-left:4px; }
 
 .hero-value{
   margin-top: 12px;
-  font-size: 30px;
+  font-size: 31px;
   line-height: 1;
   font-weight: 950;
   color:#10203f;
+}
+
+.hero-value.kwh{
+  color:#3451a3;
 }
 
 .hero-value.money{

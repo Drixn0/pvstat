@@ -54,10 +54,6 @@ function setScrollRef(key, el) {
   else scrollRefMap.delete(String(key))
 }
 
-const COL_W = 86
-const COL_GAP = 6
-const STEP = COL_W + COL_GAP
-
 function clampJumpDay(d) {
   const n = Number(d)
   if (!Number.isFinite(n) || n < 1) return '01'
@@ -73,8 +69,9 @@ async function scrollAllToDay(d) {
   if (idx < 0) return
 
   await nextTick()
-  const left = idx * STEP
   for (const el of scrollRefMap.values()) {
+    const targetEl = el?.children?.[idx]
+    const left = targetEl?.offsetLeft ?? 0
     try {
       el.scrollTo({ left, behavior: 'smooth' })
     } catch {
@@ -553,14 +550,14 @@ function exportMonthlyDetails() {
 }
 
 .page-mask-title{
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 900;
   color: #0f172a;
 }
 
 .page-mask-sub{
   margin-top: 6px;
-  font-size: 13px;
+  font-size: 14px;
   color: #64748b;
 }
 
@@ -577,14 +574,14 @@ function exportMonthlyDetails() {
 }
 
 .error-title{
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 900;
   color: #991b1b;
 }
 
 .error-text{
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 13px;
   color: #b91c1c;
 }
 
@@ -605,14 +602,14 @@ function exportMonthlyDetails() {
 }
 
 .readonly-title{
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 900;
   color:#854d0e;
 }
 
 .readonly-text{
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 13px;
   color:#713f12;
 }
 
@@ -622,7 +619,7 @@ function exportMonthlyDetails() {
   border-radius: 999px;
   border: none;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 900;
   color:#fff;
   background: linear-gradient(135deg, #d97706 0%, #ea580c 100%);
@@ -643,14 +640,14 @@ function exportMonthlyDetails() {
 }
 
 .section-title{
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 900;
   color:#14213d;
 }
 
 .section-sub{
   margin-top: 3px;
-  font-size: 11px;
+  font-size: 12px;
   color:#64748b;
 }
 
@@ -662,7 +659,7 @@ function exportMonthlyDetails() {
   border-radius: 999px;
   background: rgba(255,255,255,.8);
   border: 1px solid rgba(184,198,226,.28);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   color:#3451a3;
 }
@@ -781,7 +778,7 @@ function exportMonthlyDetails() {
 }
 
 .footer-content{
-  font-size: 14px;
+  font-size: 15px;
   letter-spacing: 2px;
   font-weight: 600;
   color: rgba(0,0,0,0.52);

@@ -89,12 +89,12 @@ async function handleEnter(day) {
           </div>
 
           <div class="inline-stats">
-          <div class="mini-stat">
+          <div class="mini-stat kwh">
             <span class="mini-label">月发电</span>
             <strong>{{ getUserStats(user.id).monthTotalKwh.toFixed(2) }}</strong>
             <span class="mini-unit">kWh</span>
           </div>
-          <div class="mini-stat">
+          <div class="mini-stat kwh">
             <span class="mini-label">每kW</span>
             <strong>{{ getUserStats(user.id).monthEqHours.toFixed(2) }}</strong>
             <span class="mini-unit">h</span>
@@ -133,7 +133,7 @@ async function handleEnter(day) {
             <div class="cell-label head-cell-label">发电量</div>
             <div class="head-placeholder">电量</div>
           </div>
-          <div class="cell-metric head-cell-metric">
+          <div class="cell-metric head-cell-metric kwh">
             <span class="metric-label head-metric-label">每kW</span>
           </div>
           <div class="cell-metric head-cell-metric money">
@@ -163,9 +163,9 @@ async function handleEnter(day) {
             />
             </div>
 
-            <div class="cell-metric">
-              <span class="metric-label">每kW</span>
-              <span class="metric-value">{{ isCellSaving(user.id, d) ? '保存中...' : getPerKw(user, d).toFixed(3) }}</span>
+            <div class="cell-metric kwh">
+              <span class="metric-label kwh">每kW</span>
+              <span class="metric-value kwh">{{ isCellSaving(user.id, d) ? '保存中...' : getPerKw(user, d).toFixed(3) }}</span>
             </div>
             <div class="cell-metric money">
               <span class="metric-label">金额</span>
@@ -241,7 +241,7 @@ async function handleEnter(day) {
 }
 
 .eyebrow{
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -250,7 +250,7 @@ async function handleEnter(day) {
 
 .name{
   margin-top: 3px;
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 950;
   color:#0f172a;
   line-height: 1.1;
@@ -266,14 +266,14 @@ async function handleEnter(day) {
 }
 
 .pill{
-  font-size: 10px;
-  font-weight: 900;
-  color:#0f172a;
+  font-size: 11px;
+  font-weight: 800;
+  color:#41506d;
   white-space: nowrap;
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(255,255,255,.68);
-  border: 1px solid rgba(15,23,42,.08);
+  background: rgba(255,255,255,.5);
+  border: 1px solid rgba(148,163,184,.18);
 }
 
 .inline-stats{
@@ -289,9 +289,18 @@ async function handleEnter(day) {
   min-width: 0;
   padding: 9px 10px 8px;
   border-radius: 16px;
-  background: rgba(255,255,255,.92);
-  border: 1px solid rgba(184,198,226,.30);
-  color:#0f172a;
+  background: rgba(255,255,255,.78);
+  border: 1px solid rgba(184,198,226,.22);
+  color:#334155;
+}
+
+.mini-stat.kwh{
+  background: rgba(236,243,255,.84);
+  border-color: rgba(125,158,235,.28);
+}
+
+.mini-stat.kwh strong{
+  color:#3451a3;
 }
 
 .mini-stat.money strong{
@@ -300,35 +309,36 @@ async function handleEnter(day) {
 
 .mini-label{
   display:block;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  color:#64748b;
+  color:#75839b;
 }
 
 .mini-stat strong{
   display:block;
   margin-top: 3px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.1;
+  color:#334155;
 }
 
 .mini-unit{
   display:block;
   margin-top: 3px;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   color:#7a8aa8;
 }
 
 .entry-inline-title{
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 900;
   color:#22314f;
 }
 
 .entry-inline-sub{
   margin-top: 3px;
-  font-size: 11px;
+  font-size: 12px;
   color:#64748b;
 }
 
@@ -349,7 +359,7 @@ async function handleEnter(day) {
   display:flex;
   align-items:center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 900;
   padding: 7px 10px;
   border-radius: 999px;
@@ -375,7 +385,7 @@ async function handleEnter(day) {
 
 .entry-shell{
   margin-top: 8px;
-  padding: 8px;
+  padding: 10px;
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(255,255,255,.72), rgba(245,248,255,.90));
   border: 1px solid rgba(15,23,42,.05);
@@ -386,31 +396,34 @@ async function handleEnter(day) {
   align-items:baseline;
   justify-content:space-between;
   gap: 10px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   padding: 0 2px;
 }
 
 .day-strip{
   display:flex;
-  gap: 6px;
+  gap: 8px;
   align-items: stretch;
 }
 
 .day-col-head{
-  width: 92px;
-  flex: 0 0 92px;
+  width: 96px;
+  flex: 0 0 96px;
   border: 1px solid rgba(15,23,42,.06);
   background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(249,251,255,.92));
   border-radius: 16px;
-  padding: 8px;
+  padding: 9px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.92);
 }
 
 .day-scroll{
   display:grid;
   grid-auto-flow: column;
-  grid-auto-columns: 86px;
-  gap: 6px;
+  --visible-cols: 7;
+  --day-gap: 8px;
+  grid-auto-columns: calc((100% - (var(--visible-cols) - 1) * var(--day-gap)) / var(--visible-cols));
+  gap: 8px;
+  width: 100%;
   overflow-x: auto;
   padding-bottom: 4px;
   scroll-behavior: smooth;
@@ -425,16 +438,16 @@ async function handleEnter(day) {
   border: 1px solid rgba(15,23,42,.06);
   background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(249,251,255,.92));
   border-radius: 16px;
-  padding: 8px;
+  padding: 9px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.92);
 }
 
-.day-title{ font-size: 10px; color:#64748b; font-weight: 900; }
+.day-title{ font-size: 13px; color:#64748b; font-weight: 900; }
 
 .cell-box{
   margin-top: 8px;
-  padding: 5px 6px 6px;
-  border-radius: 11px;
+  padding: 7px 8px 8px;
+  border-radius: 12px;
   background: linear-gradient(180deg, rgba(241,245,255,.94), rgba(255,255,255,.92));
   border: 1px solid rgba(184,198,226,.35);
 }
@@ -445,8 +458,8 @@ async function handleEnter(day) {
 }
 
 .cell-label{
-  margin-bottom: 4px;
-  font-size: 9px;
+  margin-bottom: 5px;
+  font-size: 12px;
   font-weight: 800;
   color:#6d7f9c;
   line-height: 1.1;
@@ -461,10 +474,10 @@ async function handleEnter(day) {
 }
 
 .head-placeholder{
-  min-height: 30px;
+  min-height: 34px;
   display:flex;
   align-items:center;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 900;
   color:#334155;
   white-space: nowrap;
@@ -472,63 +485,78 @@ async function handleEnter(day) {
 
 .cell-input{ margin-top: 0; }
 .cell-input :deep(.el-input__wrapper){
-  border-radius: 10px;
+  min-height: 34px;
+  border-radius: 12px;
   background: rgba(255,255,255,.96);
   box-shadow: none;
-  padding: 0 8px;
+  padding: 0 10px;
   border: 1px solid rgba(184,198,226,.35);
 }
 
 .cell-input :deep(input){
   text-align: right;
+  font-size: 15px;
   font-weight: 900;
   color:#0f172a;
 }
 
 .cell-metric{
-  margin-top: 4px;
+  margin-top: 6px;
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap: 6px;
-  padding: 4px 6px;
-  border-radius: 9px;
+  padding: 6px 7px;
+  border-radius: 10px;
   background: rgba(255,255,255,.74);
-  min-height: 34px;
+  min-height: 36px;
+}
+
+.cell-metric.kwh{
+  background: rgba(236,243,255,.72);
 }
 
 .metric-label{
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 800;
   color:#7a8aa8;
   white-space: nowrap;
   flex: 0 0 auto;
 }
 
+.metric-label.kwh{
+  color:#4560a5;
+}
+
 .metric-value{
   text-align: right;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 900;
   color:#0f172a;
   white-space: nowrap;
   flex: 0 0 auto;
 }
 
+.metric-value.kwh{ color:#3451a3; }
 .cell-metric.money .metric-value{ color:#d33; }
 .head-cell-metric{
   justify-content:flex-start;
 }
 
 .head-metric-label{
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 900;
+}
+
+.head-cell-metric.kwh .head-metric-label{
+  color:#4560a5;
 }
 
 .head-cell-metric.money .head-metric-label{
   color:#ef4444;
 }
-.hint{ margin-top: 6px; font-size: 10px; color:#64748b; }
-.unit{ font-size: 11px; color:#64748b; font-weight:700; margin-left:4px; }
+.hint{ margin-top: 6px; font-size: 12px; color:#64748b; }
+.unit{ font-size: 12px; color:#64748b; font-weight:700; margin-left:4px; }
 
 @media (max-width: 1200px){
   .card-head{
@@ -546,6 +574,10 @@ async function handleEnter(day) {
     padding-left: 0;
     border-top: 1px solid rgba(184,198,226,.38);
     padding-top: 12px;
+  }
+
+  .day-scroll{
+    width: 100%;
   }
 }
 

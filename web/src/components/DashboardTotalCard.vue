@@ -33,7 +33,7 @@ defineProps({
       <div class="total-right">
         <div class="total-kpi">
           <div class="kpi-label">月总电量</div>
-          <div class="kpi-value">{{ grandTotals.kwh.toFixed(2) }} <span class="unit">kWh</span></div>
+          <div class="kpi-value kwh">{{ grandTotals.kwh.toFixed(2) }} <span class="unit">kWh</span></div>
         </div>
         <div class="total-kpi">
           <div class="kpi-label">月总金额</div>
@@ -61,9 +61,9 @@ defineProps({
         <div class="day-scroll" :ref="(el) => setScrollRef('TOTAL', el)">
           <div class="day-col" v-for="d in daysInMonth" :key="'TOTAL-' + d">
             <div class="day-title">{{ Number(d) }}</div>
-            <div class="metric-card">
-              <span class="metric-caption">发电量</span>
-              <span class="cell-text strong">{{ getDailyTotals(d).kwh.toFixed(2) }}</span>
+            <div class="metric-card kwh">
+              <span class="metric-caption kwh">发电量</span>
+              <span class="cell-text kwh strong">{{ getDailyTotals(d).kwh.toFixed(2) }}</span>
             </div>
             <div class="metric-card money">
               <span class="metric-caption">金额</span>
@@ -94,8 +94,8 @@ defineProps({
   gap: 12px;
 }
 
-.total-title{ font-size: 17px; font-weight: 900; color:#0f172a; }
-.total-sub{ margin-top: 3px; font-size: 11px; color:#64748b; }
+.total-title{ font-size: 19px; font-weight: 900; color:#0f172a; }
+.total-sub{ margin-top: 3px; font-size: 13px; color:#64748b; }
 .total-right{ display:flex; gap: 8px; flex-wrap: wrap; }
 .total-kpi{
   min-width: 120px;
@@ -104,8 +104,9 @@ defineProps({
   background: rgba(245,248,255,.88);
   border: 1px solid rgba(15,23,42,.05);
 }
-.total-kpi .kpi-label{ font-size: 10px; color:#64748b; }
-.total-kpi .kpi-value{ margin-top: 3px; font-size: 13px; font-weight: 900; color:#0f172a; text-align:right; }
+.total-kpi .kpi-label{ font-size: 12px; color:#64748b; }
+.total-kpi .kpi-value{ margin-top: 3px; font-size: 15px; font-weight: 900; color:#0f172a; text-align:right; }
+.total-kpi .kpi-value.kwh{ color:#3451a3; }
 .total-kpi .kpi-value.money{ color:#d33; }
 
 .total-shell{
@@ -126,7 +127,7 @@ defineProps({
 }
 
 .shell-note{
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 900;
   color:#22314f;
 }
@@ -146,7 +147,7 @@ defineProps({
   border-radius: 999px;
   background: rgba(255,255,255,.82);
   border: 1px solid rgba(184,198,226,.26);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   color:#4560a5;
 }
@@ -179,10 +180,15 @@ defineProps({
   padding: 4px 6px;
   border-radius: 9px;
   background: rgba(255,255,255,.74);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 900;
   color:#334155;
   white-space: nowrap;
+}
+
+.head-metric.kwh{
+  color:#3451a3;
+  background: rgba(236,243,255,.82);
 }
 
 .head-metric.amount{
@@ -193,8 +199,11 @@ defineProps({
 .day-scroll{
   display:grid;
   grid-auto-flow: column;
-  grid-auto-columns: 86px;
+  --visible-cols: 7;
+  --day-gap: 6px;
+  grid-auto-columns: calc((100% - (var(--visible-cols) - 1) * var(--day-gap)) / var(--visible-cols));
   gap: 6px;
+  width: 100%;
   overflow-x: auto;
   padding-bottom: 4px;
   scroll-behavior: smooth;
@@ -213,7 +222,7 @@ defineProps({
   box-shadow: inset 0 1px 0 rgba(255,255,255,.92);
 }
 
-.day-title{ font-size: 10px; color:#64748b; font-weight: 900; }
+.day-title{ font-size: 13px; color:#64748b; font-weight: 900; }
 
 .metric-card{
   margin-top: 8px;
@@ -227,33 +236,46 @@ defineProps({
   background: rgba(255,255,255,.74);
 }
 
+.metric-card.kwh{
+  background: rgba(236,243,255,.78);
+}
+
 .metric-card.money{
   margin-top: 4px;
 }
 
 .metric-caption{
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
   color:#7a8aa8;
   white-space: nowrap;
 }
 
+.metric-caption.kwh{
+  color:#4560a5;
+}
+
 .cell-text{
   text-align: right;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 900;
   color:#0f172a;
   white-space: nowrap;
 }
 
+.cell-text.kwh{ color:#3451a3; }
 .cell-text.money{ color:#d33; }
 .cell-text.strong{ font-weight: 1000; }
-.unit{ font-size: 10px; color:#64748b; font-weight:700; margin-left:4px; }
+.unit{ font-size: 11px; color:#64748b; font-weight:700; margin-left:4px; }
 
 @media (max-width: 960px){
   .total-shell-head{
     flex-direction: column;
     align-items:flex-start;
+  }
+
+  .day-scroll{
+    width: 100%;
   }
 }
 </style>
