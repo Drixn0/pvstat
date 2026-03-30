@@ -120,6 +120,9 @@ SQLite 数据已挂载到 Docker volume：
 - `APP_VERSION`: 健康检查返回的版本号
 - `HEALTHCHECK_DB`: 是否执行数据库健康检查，默认 `true`
 - `ALLOWED_ORIGIN`: CORS 允许来源，默认 `*`
+- `JSON_BODY_LIMIT`: JSON 请求体大小限制，默认 `256kb`
+- `DB_BUSY_TIMEOUT_MS`: SQLite 锁等待时间，默认 `5000`
+- `DB_JOURNAL_MODE`: SQLite 日志模式，默认 `WAL`
 
 参考示例：
 
@@ -130,6 +133,7 @@ SQLite 数据已挂载到 Docker volume：
 - `web` 容器：使用 `nginx` 提供静态页面，并代理 `/api` 与 `/health`
 - `server` 容器：运行 Express + SQLite 服务
 - `server` 与 `web` 均已配置容器级健康检查
+- `server` 提供 `/live` 与 `/ready`，分别用于存活检查和就绪检查
 
 ### 相关文件
 

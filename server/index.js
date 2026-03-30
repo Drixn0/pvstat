@@ -4,6 +4,9 @@ import Database from 'better-sqlite3'
 import { fileURLToPath } from 'node:url'
 
 const APP_VERSION = process.env.APP_VERSION || '2.0.0'
+const DEFAULT_JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '256kb'
+const DEFAULT_DB_BUSY_TIMEOUT_MS = Number(process.env.DB_BUSY_TIMEOUT_MS || 5000)
+const DEFAULT_DB_JOURNAL_MODE = process.env.DB_JOURNAL_MODE || 'WAL'
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -72,6 +75,17 @@ function dateIsValid(date) {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date
 }
 
+function normalizeBoolean(value, defaultValue = false) {
+  if (value == null || value === '') return defaultValue
+  return String(value).toLowerCase() !== 'false'
+}
+
+function normalizePositiveNumber(value, defaultValue) {
+  const num = Number(value)
+  if (!Number.isFinite(num) || num <= 0) return defaultValue
+  return num
+}
+
 export function initSchema(db) {
   db.exec(`
   CREATE TABLE IF NOT EXISTS households (
@@ -95,7 +109,13 @@ export function initSchema(db) {
 export function createApp(options = {}) {
   const dbPath = options.dbPath ?? process.env.DB_PATH ?? 'pv.db'
   const allowedOrigin = options.allowedOrigin ?? process.env.ALLOWED_ORIGIN ?? '*'
-  const enableDbHealthcheck = (options.enableDbHealthcheck ?? process.env.HEALTHCHECK_DB ?? 'true') !== 'false'
+  const enableDbHealthcheck = normalizeBoolean(options.enableDbHealthcheck ?? process.env.HEALTHCHECK_DB, true)
+  const jsonBodyLimit = options.jsonBodyLimit ?? DEFAULT_JSON_BODY_LIMIT
+  const dbBusyTimeoutMs = normalizePositiveNumber(
+    options.dbBusyTimeoutMs ?? process.env.DB_BUSY_TIMEOUT_MS,
+    DEFAULT_DB_BUSY_TIMEOUT_MS
+  )
+  const dbJournalMode = options.dbJournalMode ?? process.env.DB_JOURNAL_MODE ?? DEFAULT_DB_JOURNAL_MODE
   const app = express()
 
   app.disable('x-powered-by')
@@ -103,10 +123,13 @@ export function createApp(options = {}) {
   app.use(cors({
     origin: allowedOrigin === '*' ? true : allowedOrigin
   }))
-  app.use(express.json())
+  app.use(express.json({ limit: jsonBodyLimit }))
 
   const db = new Database(dbPath)
   db.pragma('foreign_keys = ON')
+  db.pragma(`busy_timeout = ${dbBusyTimeoutMs}`)
+  db.pragma(`journal_mode = ${dbJournalMode}`)
+  db.pragma('synchronous = NORMAL')
   initSchema(db)
 
   const startedAt = Date.now()
@@ -190,8 +213,19 @@ export function createApp(options = {}) {
       },
       config: {
         dbHealthcheck: enableDbHealthcheck,
-        allowedOrigin
+        allowedOrigin,
+        jsonBodyLimit,
+        dbBusyTimeoutMs,
+        dbJournalMode
       }
+    })
+  }))
+
+  app.get('/live', route((req, res) => {
+    res.json({
+      success: true,
+      status: 'live',
+      version: APP_VERSION
     })
   }))
 
@@ -308,13 +342,27 @@ export function startServer(options = {}) {
     console.log(`Server running at http://localhost:${port}`)
   })
 
+  let closed = false
+
+  function shutdown() {
+    if (closed) return
+    closed = true
+    server.close(() => {
+      close()
+    })
+  }
+
+  process.once('SIGINT', shutdown)
+  process.once('SIGTERM', shutdown)
+
   return {
     app,
     db,
     server,
     close() {
-      server.close()
-      close()
+      process.removeListener('SIGINT', shutdown)
+      process.removeListener('SIGTERM', shutdown)
+      shutdown()
     }
   }
 }

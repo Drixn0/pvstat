@@ -57,3 +57,58 @@ test('deleting a household also removes generation rows', async () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   }
 })
+
+test('health endpoint reflects runtime config options', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvstat-test-'))
+  const dbPath = path.join(tmpDir, 'test.db')
+  const svc = createApp({
+    dbPath,
+    allowedOrigin: 'http://example.com',
+    enableDbHealthcheck: false,
+    jsonBodyLimit: '128kb',
+    dbBusyTimeoutMs: 1500,
+    dbJournalMode: 'WAL'
+  })
+
+  try {
+    const req = { method: 'GET', url: '/health', headers: {} }
+    const res = {
+      statusCode: 200,
+      headers: {},
+      body: '',
+      setHeader(name, value) {
+        this.headers[name] = value
+      },
+      getHeader(name) {
+        return this.headers[name]
+      },
+      status(code) {
+        this.statusCode = code
+        return this
+      },
+      json(payload) {
+        this.body = payload
+        return this
+      }
+    }
+
+    await new Promise((resolve, reject) => {
+      svc.app.handle(req, res, (error) => {
+        if (error) reject(error)
+        else resolve()
+      })
+      if (res.body) resolve()
+    })
+
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.body.status, 'ok')
+    assert.equal(res.body.config.dbHealthcheck, false)
+    assert.equal(res.body.config.allowedOrigin, 'http://example.com')
+    assert.equal(res.body.config.jsonBodyLimit, '128kb')
+    assert.equal(res.body.config.dbBusyTimeoutMs, 1500)
+    assert.equal(res.body.config.dbJournalMode, 'WAL')
+  } finally {
+    svc.close()
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+})

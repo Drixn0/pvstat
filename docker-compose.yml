@@ -10,11 +10,14 @@ services:
       APP_VERSION: 2.0.0
       HEALTHCHECK_DB: "true"
       ALLOWED_ORIGIN: "*"
+      JSON_BODY_LIMIT: 256kb
+      DB_BUSY_TIMEOUT_MS: 5000
+      DB_JOURNAL_MODE: WAL
     volumes:
       - pvstat-data:/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/live').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
