@@ -54,8 +54,8 @@ function setScrollRef(key, el) {
   else scrollRefMap.delete(String(key))
 }
 
-const COL_W = 108
-const COL_GAP = 10
+const COL_W = 86
+const COL_GAP = 6
 const STEP = COL_W + COL_GAP
 
 function clampJumpDay(d) {

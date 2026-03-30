@@ -159,7 +159,7 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 <style scoped>
 .header-shell{
   margin-bottom: 10px;
-  padding: 18px 18px 14px;
+  padding: 14px 16px 10px;
   border-radius: 24px;
   border: 1px solid rgba(15,23,42,.05);
   background: linear-gradient(180deg, rgba(255,255,255,.84), rgba(255,255,255,.68));
@@ -171,20 +171,20 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
   display:flex;
   align-items:flex-start;
   justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 12px;
+  gap: 14px;
+  margin-bottom: 10px;
 }
 
 .app-title{
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 900;
   color: #0f172a;
   letter-spacing: .2px;
 }
 
 .app-sub{
-  margin-top: 6px;
-  font-size: 13px;
+  margin-top: 4px;
+  font-size: 12px;
   color: #64748b;
 }
 
@@ -197,7 +197,7 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 }
 
 .toolbar-shell{
-  padding: 6px;
+  padding: 4px;
   border-radius: 24px;
   background: linear-gradient(180deg, rgba(244,247,255,.86), rgba(255,255,255,.78));
   border: 1px solid rgba(184,198,226,.28);
@@ -205,8 +205,8 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 }
 
 .control-card{
-  min-height: 84px;
-  padding: 8px 12px 10px;
+  min-height: 72px;
+  padding: 6px 10px 8px;
   border-radius: 18px;
   background: rgba(255,255,255,.72);
   border: 1px solid rgba(184,198,226,.24);
@@ -219,9 +219,9 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
   display:flex;
   align-items:center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 11px;
   color: #64748b;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .ios-picker :deep(.el-input__wrapper),
@@ -235,12 +235,12 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 .ios-select{ width: 92px; }
 .jump-row{ display:flex; gap:8px; align-items:center; }
 .action-row{
-  min-height: 40px;
+  min-height: 36px;
 }
 
 .ios-btn{
   border-radius: 999px;
-  height: 40px;
+  height: 36px;
   border: 1px solid rgba(15,23,42,.08);
   background: rgba(255,255,255,.92);
   box-shadow: none;
@@ -260,38 +260,38 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 }
 
 .create-btn{
-  min-width: 140px;
+  min-width: 126px;
   width: 100%;
 }
 
 .create-card{
-  min-width: 168px;
+  min-width: 154px;
 }
 
 .summary{
   display:grid;
   grid-template-columns: minmax(260px, 1.1fr) minmax(420px, 2fr);
-  gap: 12px;
+  gap: 10px;
 }
 
 .summary-side{
   display:grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .summary-main{
   display:grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 .summary-card{
   border: 1px solid rgba(184,198,226,.30);
   background: rgba(248,250,255,.82);
   border-radius: 18px;
-  padding: 12px 14px 13px;
-  min-height: 86px;
+  padding: 10px 12px 11px;
+  min-height: 74px;
   position: relative;
   overflow: hidden;
 }
@@ -309,12 +309,12 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 }
 
 .summary-card.compact{
-  min-height: 78px;
+  min-height: 68px;
 }
 
 .hero-card{
-  min-height: 118px;
-  padding: 16px 18px 18px;
+  min-height: 96px;
+  padding: 12px 14px 14px;
 }
 
 .summary-card.emphasis{
@@ -334,7 +334,7 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
   background: linear-gradient(90deg, rgba(239,68,68,.28), rgba(239,68,68,0));
 }
 
-.summary-label{ font-size: 12px; color: #64748b; }
+.summary-label{ font-size: 11px; color: #64748b; }
 
 .hero-meta{
   display:flex;
@@ -344,14 +344,14 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 }
 
 .hero-note{
-  font-size: 11px;
+  font-size: 10px;
   color:#7b89a3;
   white-space: nowrap;
 }
 
 .summary-value{
-  margin-top: 6px;
-  font-size: 22px;
+  margin-top: 4px;
+  font-size: 20px;
   font-weight: 900;
   color: #0f172a;
   line-height: 1.1;
@@ -361,8 +361,8 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 .unit{ font-size: 11px; color:#64748b; font-weight:700; margin-left:4px; }
 
 .hero-value{
-  margin-top: 18px;
-  font-size: 34px;
+  margin-top: 12px;
+  font-size: 30px;
   line-height: 1;
   font-weight: 950;
   color:#10203f;
@@ -373,7 +373,7 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 }
 
 .summary-skeleton{
-  margin-top: 8px;
+  margin-top: 6px;
   border-radius: 999px;
   background: linear-gradient(90deg, rgba(226,232,240,.75), rgba(248,250,252,.98), rgba(226,232,240,.75));
   background-size: 200% 100%;
@@ -382,13 +382,13 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 
 .summary-skeleton-value{
   width: 72%;
-  height: 24px;
+  height: 20px;
 }
 
 .hero-skeleton{
-  margin-top: 18px;
+  margin-top: 12px;
   width: 78%;
-  height: 38px;
+  height: 32px;
 }
 
 @keyframes skeletonShift{
@@ -409,7 +409,7 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 
 @media (max-width: 960px){
   .header-shell{
-    padding: 16px 14px 12px;
+    padding: 12px 12px 10px;
   }
 
   .nav{
