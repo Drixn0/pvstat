@@ -7,6 +7,38 @@ import Database from 'better-sqlite3'
 
 import { createApp, initSchema, requireDate, requireMonth } from './index.js'
 
+async function invokeApp(app, req) {
+  const res = {
+    statusCode: 200,
+    headers: {},
+    body: '',
+    setHeader(name, value) {
+      this.headers[name] = value
+    },
+    getHeader(name) {
+      return this.headers[name]
+    },
+    status(code) {
+      this.statusCode = code
+      return this
+    },
+    json(payload) {
+      this.body = payload
+      return this
+    }
+  }
+
+  await new Promise((resolve, reject) => {
+    app.handle(req, res, (error) => {
+      if (error) reject(error)
+      else resolve()
+    })
+    if (res.body) resolve()
+  })
+
+  return res
+}
+
 test('rejects invalid household payloads', async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvstat-test-'))
   const dbPath = path.join(tmpDir, 'test.db')
@@ -97,44 +129,53 @@ test('batch deleting households removes all requested rows', async () => {
     const first = insertHousehold.run('甲', 10, 1)
     const second = insertHousehold.run('乙', 12, 1.1)
 
-    const req = {
+    const loginRes = await invokeApp(svc.app, {
+      method: 'POST',
+      url: '/auth/login',
+      headers: { 'content-type': 'application/json' },
+      body: { username: 'admin', password: 'changeme123' }
+    })
+    const token = loginRes.body.token
+
+    const res = await invokeApp(svc.app, {
       method: 'POST',
       url: '/households/batch-delete',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`
+      },
       body: { ids: [first.lastInsertRowid, second.lastInsertRowid] }
-    }
-    const res = {
-      statusCode: 200,
-      headers: {},
-      body: '',
-      setHeader(name, value) {
-        this.headers[name] = value
-      },
-      getHeader(name) {
-        return this.headers[name]
-      },
-      status(code) {
-        this.statusCode = code
-        return this
-      },
-      json(payload) {
-        this.body = payload
-        return this
-      }
-    }
-
-    await new Promise((resolve, reject) => {
-      svc.app.handle(req, res, (error) => {
-        if (error) reject(error)
-        else resolve()
-      })
-      if (res.body) resolve()
     })
 
     const count = svc.db.prepare('SELECT COUNT(*) AS count FROM households').get().count
     assert.equal(res.statusCode, 200)
     assert.equal(res.body.deletedCount, 2)
     assert.equal(count, 0)
+  } finally {
+    svc.close()
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+})
+
+test('protected write endpoints require login', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvstat-test-'))
+  const dbPath = path.join(tmpDir, 'test.db')
+  const svc = createApp({ dbPath })
+
+  try {
+    const res = await invokeApp(svc.app, {
+      method: 'POST',
+      url: '/households',
+      headers: { 'content-type': 'application/json' },
+      body: {
+        name: '未授权用户',
+        capacity_kw: 10,
+        price_per_kwh: 1
+      }
+    })
+
+    assert.equal(res.statusCode, 401)
+    assert.match(res.body.error, /未登录|登录/)
   } finally {
     svc.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })

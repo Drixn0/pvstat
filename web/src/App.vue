@@ -34,6 +34,17 @@
                 用户管理
               </router-link>
             </nav>
+            <div class="auth-row">
+              <div class="auth-status" :class="{ active: isAuthenticated }">
+                {{ isAuthenticated ? `已登录：${user?.username}` : '未登录：只允许查看' }}
+              </div>
+              <button v-if="!isAuthenticated" class="auth-btn" @click="openLoginDialog('登录后才能新增、修改、删除和录入数据')">
+                管理员登录
+              </button>
+              <button v-else class="auth-btn ghost-auth-btn" @click="logout">
+                退出登录
+              </button>
+            </div>
           </div>
 
           <!-- 监控小组件 -->
@@ -132,6 +143,15 @@
       <main class="app-main">
         <router-view />
       </main>
+
+      <login-dialog
+        v-model="dialogVisible"
+        :loading="authLoading"
+        :prompt-message="promptMessage"
+        :form="form"
+        @update:model-value="closeLoginDialog"
+        @submit="submitLogin"
+      />
     </div>
   </el-config-provider>
 </template>
@@ -139,8 +159,10 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElConfigProvider } from 'element-plus'
+import { ElConfigProvider, ElMessage } from 'element-plus'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import LoginDialog from './components/LoginDialog.vue'
+import { useAuth } from './composables/useAuth'
 
 // const API_BASE = 'http://localhost:3000'
 const API_BASE = ''
@@ -152,6 +174,19 @@ const lastCheckedAt = ref(null)
 const failStreak = ref(0)
 const health = ref(null)
 const route = useRoute()
+const {
+  user,
+  loading: authLoading,
+  dialogVisible,
+  promptMessage,
+  form,
+  isAuthenticated,
+  refreshSession,
+  login,
+  logout,
+  openLoginDialog,
+  closeLoginDialog
+} = useAuth()
 
 const showPopover = ref(false)
 
@@ -275,6 +310,18 @@ async function checkHealth() {
   }
 }
 
+async function submitLogin() {
+  try {
+    await login({
+      username: form.username,
+      password: form.password
+    })
+    ElMessage.success('登录成功')
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.error || error?.message || '登录失败')
+  }
+}
+
 function manualCheck() {
   checkHealth()
 }
@@ -290,6 +337,7 @@ function onVisibilityChange() {
 onMounted(() => {
   document.addEventListener('visibilitychange', onVisibilityChange)
   onVisibilityChange()
+  refreshSession()
   checkHealth()
 })
 
@@ -488,6 +536,57 @@ onUnmounted(() => {
   display:flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.auth-row{
+  margin-top: 12px;
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.auth-status{
+  display:inline-flex;
+  align-items:center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.64);
+  border: 1px solid rgba(15,23,42,.08);
+  color:#64748b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.auth-status.active{
+  color:#166534;
+  border-color: rgba(34,197,94,.18);
+  background: rgba(240,253,244,.88);
+}
+
+.auth-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width: 96px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+  color:#fff;
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  box-shadow: 0 10px 24px rgba(99,102,241,.18);
+}
+
+.ghost-auth-btn{
+  color:#0f172a;
+  background: rgba(255,255,255,.72);
+  border: 1px solid rgba(15,23,42,.10);
+  box-shadow: 0 8px 18px rgba(15,23,42,.06);
 }
 
 .nav-link{

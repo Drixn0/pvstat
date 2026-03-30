@@ -2,11 +2,16 @@ import express from 'express'
 import cors from 'cors'
 import Database from 'better-sqlite3'
 import { fileURLToPath } from 'node:url'
+import crypto from 'node:crypto'
 
 const APP_VERSION = process.env.APP_VERSION || '2.0.0'
 const DEFAULT_JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '256kb'
 const DEFAULT_DB_BUSY_TIMEOUT_MS = Number(process.env.DB_BUSY_TIMEOUT_MS || 5000)
 const DEFAULT_DB_JOURNAL_MODE = process.env.DB_JOURNAL_MODE || 'WAL'
+const DEFAULT_ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin'
+const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme123'
+const DEFAULT_AUTH_SECRET = process.env.AUTH_SECRET || 'pvstat-local-auth-secret'
+const DEFAULT_AUTH_TOKEN_TTL_HOURS = Number(process.env.AUTH_TOKEN_TTL_HOURS || 24)
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -95,6 +100,56 @@ function normalizePositiveNumber(value, defaultValue) {
   return num
 }
 
+function toBase64Url(value) {
+  return Buffer.from(value).toString('base64url')
+}
+
+function fromBase64Url(value) {
+  return Buffer.from(value, 'base64url').toString('utf8')
+}
+
+function signTokenPayload(payload, secret) {
+  return crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('base64url')
+}
+
+function createAuthToken({ username, expiresAt, secret }) {
+  const payload = JSON.stringify({ username, expiresAt })
+  const encodedPayload = toBase64Url(payload)
+  const signature = signTokenPayload(encodedPayload, secret)
+  return `${encodedPayload}.${signature}`
+}
+
+function verifyAuthToken(token, secret) {
+  if (!token || typeof token !== 'string' || !token.includes('.')) {
+    throw new HttpError(401, '未登录或登录已过期')
+  }
+
+  const [encodedPayload, signature] = token.split('.', 2)
+  const expectedSignature = signTokenPayload(encodedPayload, secret)
+  if (signature !== expectedSignature) {
+    throw new HttpError(401, '登录状态无效，请重新登录')
+  }
+
+  let payload
+  try {
+    payload = JSON.parse(fromBase64Url(encodedPayload))
+  } catch {
+    throw new HttpError(401, '登录状态无效，请重新登录')
+  }
+
+  if (!payload?.username || !payload?.expiresAt || Date.now() >= Number(payload.expiresAt)) {
+    throw new HttpError(401, '登录已过期，请重新登录')
+  }
+
+  return {
+    username: payload.username,
+    expiresAt: Number(payload.expiresAt)
+  }
+}
+
 export function initSchema(db) {
   db.exec(`
   CREATE TABLE IF NOT EXISTS households (
@@ -138,6 +193,13 @@ export function createApp(options = {}) {
     DEFAULT_DB_BUSY_TIMEOUT_MS
   )
   const dbJournalMode = options.dbJournalMode ?? process.env.DB_JOURNAL_MODE ?? DEFAULT_DB_JOURNAL_MODE
+  const adminUsername = options.adminUsername ?? process.env.ADMIN_USERNAME ?? DEFAULT_ADMIN_USERNAME
+  const adminPassword = options.adminPassword ?? process.env.ADMIN_PASSWORD ?? DEFAULT_ADMIN_PASSWORD
+  const authSecret = options.authSecret ?? process.env.AUTH_SECRET ?? DEFAULT_AUTH_SECRET
+  const authTokenTtlHours = normalizePositiveNumber(
+    options.authTokenTtlHours ?? process.env.AUTH_TOKEN_TTL_HOURS,
+    DEFAULT_AUTH_TOKEN_TTL_HOURS
+  )
   const app = express()
 
   app.disable('x-powered-by')
@@ -277,6 +339,40 @@ export function createApp(options = {}) {
     }
   }
 
+  function requireAuth(req, res, next) {
+    const authHeader = String(req.headers.authorization || '')
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+    try {
+      req.auth = verifyAuthToken(token, authSecret)
+      next()
+    } catch (error) {
+      next(error)
+    }
+  }
+
+  function parseLoginPayload(body) {
+    return {
+      username: requireNonEmptyString(body.username, '用户名'),
+      password: requireNonEmptyString(body.password, '密码')
+    }
+  }
+
+  function issueLoginResponse(username) {
+    const expiresAt = Date.now() + authTokenTtlHours * 60 * 60 * 1000
+    const token = createAuthToken({
+      username,
+      expiresAt,
+      secret: authSecret
+    })
+    return {
+      token,
+      user: {
+        username,
+        expiresAt
+      }
+    }
+  }
+
   app.get('/health', route((req, res) => {
     let dbOk = true
     let dbErr = null
@@ -337,11 +433,29 @@ export function createApp(options = {}) {
     }
   }))
 
+  app.post('/auth/login', route((req, res) => {
+    const payload = parseLoginPayload(req.body)
+    if (payload.username !== adminUsername || payload.password !== adminPassword) {
+      throw new HttpError(401, '用户名或密码错误')
+    }
+    res.json({
+      success: true,
+      ...issueLoginResponse(payload.username)
+    })
+  }))
+
+  app.get('/auth/me', requireAuth, route((req, res) => {
+    res.json({
+      success: true,
+      user: req.auth
+    })
+  }))
+
   app.get('/households', route((req, res) => {
     res.json(db.prepare('SELECT * FROM households ORDER BY id ASC').all())
   }))
 
-  app.post('/households', route((req, res) => {
+  app.post('/households', requireAuth, route((req, res) => {
     const payload = parseHouseholdPayload(req.body)
     const result = createHouseholdStmt.run(
       payload.name,
@@ -351,7 +465,7 @@ export function createApp(options = {}) {
     res.status(201).json({ success: true, id: result.lastInsertRowid })
   }))
 
-  app.put('/households/:id', route((req, res) => {
+  app.put('/households/:id', requireAuth, route((req, res) => {
     const householdId = requireExistingHousehold(req.params.id)
     const payload = parseHouseholdPayload(req.body)
     updateHouseholdStmt.run(
@@ -363,7 +477,7 @@ export function createApp(options = {}) {
     res.json({ success: true })
   }))
 
-  app.post('/households/batch-delete', route((req, res) => {
+  app.post('/households/batch-delete', requireAuth, route((req, res) => {
     const ids = parseBatchDeletePayload(req.body)
     deleteHouseholdsBatch(ids)
     res.json({
@@ -372,7 +486,7 @@ export function createApp(options = {}) {
     })
   }))
 
-  app.post('/generation', route((req, res) => {
+  app.post('/generation', requireAuth, route((req, res) => {
     const payload = parseGenerationPayload(req.body)
     upsertGenerationStmt.run(
       payload.householdId,
@@ -455,7 +569,7 @@ export function createApp(options = {}) {
     })
   }))
 
-  app.delete('/households/:id', route((req, res) => {
+  app.delete('/households/:id', requireAuth, route((req, res) => {
     const householdId = requireExistingHousehold(req.params.id)
     deleteHouseholdCascade(householdId)
     res.json({ success: true })
