@@ -49,6 +49,15 @@ function requirePositiveInt(value, fieldName) {
   return num
 }
 
+function requirePositiveIntArray(values, fieldName) {
+  if (!Array.isArray(values) || values.length === 0) {
+    throw new HttpError(400, `${fieldName}不能为空`)
+  }
+
+  const result = values.map((value, index) => requirePositiveInt(value, `${fieldName}第${index + 1}项`))
+  return Array.from(new Set(result))
+}
+
 export function requireMonth(value) {
   const month = String(value ?? '')
   if (!/^\d{4}-\d{2}$/.test(month) || !monthIsValid(month)) {
@@ -103,7 +112,20 @@ export function initSchema(db) {
     FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE,
     UNIQUE(household_id, date)
   );
+
+  CREATE INDEX IF NOT EXISTS idx_households_name ON households(name COLLATE NOCASE);
+  CREATE INDEX IF NOT EXISTS idx_generation_date ON generation(date);
+  CREATE INDEX IF NOT EXISTS idx_generation_household_date ON generation(household_id, date);
   `)
+}
+
+function getMonthDateRange(month) {
+  const [year, mon] = month.split('-').map(Number)
+  const start = `${year}-${String(mon).padStart(2, '0')}-01`
+  const nextYear = mon === 12 ? year + 1 : year
+  const nextMonth = mon === 12 ? 1 : mon + 1
+  const end = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`
+  return { start, end }
 }
 
 export function createApp(options = {}) {
@@ -154,7 +176,8 @@ export function createApp(options = {}) {
   const monthGenerationStmt = db.prepare(`
     SELECT household_id, date, kwh
     FROM generation
-    WHERE substr(date, 1, 7) = ?
+    WHERE date >= ? AND date < ?
+    ORDER BY date ASC, household_id ASC
   `)
   const householdByIdStmt = db.prepare(`
     SELECT id, name, capacity_kw, price_per_kwh
@@ -174,9 +197,49 @@ export function createApp(options = {}) {
     GROUP BY substr(date, 1, 7)
     ORDER BY month DESC
   `)
+  const monthOverviewStmt = db.prepare(`
+    SELECT
+      COUNT(*) AS household_count,
+      COALESCE(SUM(capacity_kw), 0) AS total_capacity_kw
+    FROM households
+  `)
+  const monthUserSummaryStmt = db.prepare(`
+    SELECT
+      h.id AS household_id,
+      COALESCE(SUM(g.kwh), 0) AS total_kwh,
+      COALESCE(SUM(g.kwh), 0) * h.price_per_kwh AS total_amount,
+      CASE
+        WHEN h.capacity_kw > 0 THEN COALESCE(SUM(g.kwh), 0) / h.capacity_kw
+        ELSE 0
+      END AS eq_hours
+    FROM households h
+    LEFT JOIN generation g
+      ON g.household_id = h.id
+     AND g.date >= ?
+     AND g.date < ?
+    GROUP BY h.id
+    ORDER BY h.id ASC
+  `)
+  const monthDailyTotalsStmt = db.prepare(`
+    SELECT
+      substr(g.date, 9, 2) AS day,
+      COALESCE(SUM(g.kwh), 0) AS total_kwh,
+      COALESCE(SUM(g.kwh * h.price_per_kwh), 0) AS total_amount
+    FROM generation g
+    INNER JOIN households h ON h.id = g.household_id
+    WHERE g.date >= ?
+      AND g.date < ?
+    GROUP BY day
+    ORDER BY day ASC
+  `)
 
   const deleteHouseholdCascade = db.transaction((householdId) => {
     return deleteHouseholdStmt.run(householdId)
+  })
+  const deleteHouseholdsBatch = db.transaction((householdIds) => {
+    householdIds.forEach((householdId) => {
+      deleteHouseholdStmt.run(householdId)
+    })
   })
 
   function parseHouseholdPayload(body) {
@@ -193,6 +256,16 @@ export function createApp(options = {}) {
       throw new HttpError(404, '用户不存在')
     }
     return householdId
+  }
+
+  function parseBatchDeletePayload(body) {
+    const ids = requirePositiveIntArray(body?.ids, '用户ID列表')
+    ids.forEach((id) => {
+      if (!householdExistsStmt.get(id)) {
+        throw new HttpError(404, `用户不存在: ${id}`)
+      }
+    })
+    return ids
   }
 
   function parseGenerationPayload(body) {
@@ -290,6 +363,15 @@ export function createApp(options = {}) {
     res.json({ success: true })
   }))
 
+  app.post('/households/batch-delete', route((req, res) => {
+    const ids = parseBatchDeletePayload(req.body)
+    deleteHouseholdsBatch(ids)
+    res.json({
+      success: true,
+      deletedCount: ids.length
+    })
+  }))
+
   app.post('/generation', route((req, res) => {
     const payload = parseGenerationPayload(req.body)
     upsertGenerationStmt.run(
@@ -302,8 +384,40 @@ export function createApp(options = {}) {
 
   app.get('/generation', route((req, res) => {
     const month = requireMonth(req.query.month)
-    const rows = monthGenerationStmt.all(month)
+    const range = getMonthDateRange(month)
+    const rows = monthGenerationStmt.all(range.start, range.end)
     res.json(rows)
+  }))
+
+  app.get('/generation/summary', route((req, res) => {
+    const month = requireMonth(req.query.month)
+    const range = getMonthDateRange(month)
+    const overview = monthOverviewStmt.get()
+    const userStats = monthUserSummaryStmt.all(range.start, range.end).map((row) => ({
+      householdId: Number(row.household_id),
+      monthTotalKwh: Number(row.total_kwh) || 0,
+      monthTotalAmount: Number(row.total_amount) || 0,
+      monthEqHours: Number(row.eq_hours) || 0
+    }))
+    const dailyTotals = monthDailyTotalsStmt.all(range.start, range.end).map((row) => ({
+      day: row.day,
+      kwh: Number(row.total_kwh) || 0,
+      amount: Number(row.total_amount) || 0
+    }))
+    const grandTotals = userStats.reduce((acc, item) => {
+      acc.kwh += item.monthTotalKwh
+      acc.amount += item.monthTotalAmount
+      return acc
+    }, { kwh: 0, amount: 0 })
+
+    res.json({
+      month,
+      householdCount: Number(overview.household_count) || 0,
+      totalCapacityKw: Number(overview.total_capacity_kw) || 0,
+      grandTotals,
+      userStats,
+      dailyTotals
+    })
   }))
 
   app.get('/households/:id/history-summary', route((req, res) => {

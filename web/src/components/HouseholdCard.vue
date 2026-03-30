@@ -1,8 +1,9 @@
 <script setup>
+import { nextTick } from 'vue'
 import { ElIcon, ElInput } from 'element-plus'
 import { Edit, Delete } from '@element-plus/icons-vue'
 
-defineProps({
+const props = defineProps({
   user: { type: Object, required: true },
   monthLabel: { type: String, required: true },
   daysInMonth: { type: Array, required: true },
@@ -20,6 +21,40 @@ defineProps({
 })
 
 defineEmits(['edit', 'delete'])
+
+const inputRefMap = new Map()
+let skipBlurKey = ''
+
+function setInputRef(day, instance) {
+  if (instance) inputRefMap.set(day, instance)
+  else inputRefMap.delete(day)
+}
+
+async function handleBlur(day) {
+  const key = `${props.user.id}-${day}`
+  if (skipBlurKey === key) {
+    skipBlurKey = ''
+    return
+  }
+  props.normalizeNumberInput(props.user, day)
+  await props.saveKwh(props.user.id, day, props.user.days[day])
+}
+
+async function handleEnter(day) {
+  const key = `${props.user.id}-${day}`
+  skipBlurKey = key
+  props.normalizeNumberInput(props.user, day)
+  await props.saveKwh(props.user.id, day, props.user.days[day])
+
+  const currentIndex = props.daysInMonth.indexOf(day)
+  const nextDay = props.daysInMonth[currentIndex + 1]
+  if (!nextDay) return
+
+  await nextTick()
+  const nextInput = inputRefMap.get(nextDay)
+  nextInput?.focus?.()
+  nextInput?.select?.()
+}
 </script>
 
 <template>
@@ -73,24 +108,15 @@ defineEmits(['edit', 'delete'])
           <div class="day-title">{{ Number(d) }}</div>
 
           <el-input
+            :ref="(instance) => setInputRef(d, instance)"
             v-model="user.days[d]"
             size="small"
             class="cell-input"
             inputmode="decimal"
             placeholder="0"
             :disabled="isPageBusy || isCellSaving(user.id, d)"
-            @blur="
-              () => {
-                normalizeNumberInput(user, d)
-                saveKwh(user.id, d, user.days[d])
-              }
-            "
-            @keyup.enter="
-              () => {
-                normalizeNumberInput(user, d)
-                saveKwh(user.id, d, user.days[d])
-              }
-            "
+            @blur="handleBlur(d)"
+            @keydown.enter.prevent="handleEnter(d)"
           />
 
           <div class="cell-text">{{ isCellSaving(user.id, d) ? '保存中...' : getPerKw(user, d).toFixed(3) }}</div>
@@ -99,7 +125,7 @@ defineEmits(['edit', 'delete'])
       </div>
     </div>
 
-    <div class="hint">只需填“电量”，下面两行自动计算；回车或失焦自动保存。</div>
+    <div class="hint">只需填“电量”，下面两行自动计算；回车自动保存并跳到下一个格子，失焦也会保存。</div>
   </div>
 </template>
 

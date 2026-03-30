@@ -1,6 +1,6 @@
 <script setup>
 import { ElButton, ElDatePicker, ElIcon, ElOption, ElSelect } from 'element-plus'
-import { Plus, Calendar, Aim } from '@element-plus/icons-vue'
+import { Plus, Calendar, Aim, Download } from '@element-plus/icons-vue'
 
 defineProps({
   month: {
@@ -23,6 +23,10 @@ defineProps({
     type: Boolean,
     default: false
   },
+  loading: {
+    type: Boolean,
+    default: false
+  },
   householdsCount: {
     type: Number,
     required: true
@@ -41,7 +45,7 @@ defineProps({
   }
 })
 
-defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 'create'])
+defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 'create', 'export'])
 </script>
 
 <template>
@@ -86,7 +90,12 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
           </div>
         </div>
 
-        <el-button class="ios-btn ios-btn-primary" :disabled="isPageBusy" @click="$emit('create')">
+        <el-button class="ios-btn" :disabled="isPageBusy || loading" @click="$emit('export')">
+          <el-icon><Download /></el-icon>
+          导出明细
+        </el-button>
+
+        <el-button class="ios-btn ios-btn-primary" :disabled="isPageBusy || loading" @click="$emit('create')">
           <el-icon><Plus /></el-icon>
           新增用户
         </el-button>
@@ -96,27 +105,32 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
     <div class="summary">
       <div class="summary-card">
         <div class="summary-label">统计月份</div>
-        <div class="summary-value">{{ monthLabel }}</div>
+        <div v-if="loading" class="summary-skeleton summary-skeleton-value"></div>
+        <div v-else class="summary-value">{{ monthLabel }}</div>
       </div>
       <div class="summary-card">
         <div class="summary-label">用户数量</div>
-        <div class="summary-value">{{ householdsCount }}</div>
+        <div v-if="loading" class="summary-skeleton summary-skeleton-value"></div>
+        <div v-else class="summary-value">{{ householdsCount }}</div>
       </div>
       <div class="summary-card">
         <div class="summary-label">用户总功率</div>
-        <div class="summary-value">
+        <div v-if="loading" class="summary-skeleton summary-skeleton-value"></div>
+        <div v-else class="summary-value">
           {{ totalCapacityKw.toFixed(2) }} <span class="unit">kW</span>
         </div>
       </div>
       <div class="summary-card">
         <div class="summary-label">{{ monthLabel }} 累计发电量</div>
-        <div class="summary-value">
+        <div v-if="loading" class="summary-skeleton summary-skeleton-value"></div>
+        <div v-else class="summary-value">
           {{ summaryMonthKwh.text }} <span class="unit">{{ summaryMonthKwh.unit }}</span>
         </div>
       </div>
       <div class="summary-card">
         <div class="summary-label">{{ monthLabel }} 累计发电收益</div>
-        <div class="summary-value money">
+        <div v-if="loading" class="summary-skeleton summary-skeleton-value"></div>
+        <div v-else class="summary-value money">
           {{ summaryMonthAmount.prefix }}{{ summaryMonthAmount.text }}
           <span class="unit">{{ summaryMonthAmount.unit }}</span>
         </div>
@@ -217,6 +231,24 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 
 .summary-value.money{ color:#d33; }
 .unit{ font-size: 12px; color:#64748b; font-weight:700; margin-left:4px; }
+
+.summary-skeleton{
+  margin-top: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(226,232,240,.75), rgba(248,250,252,.98), rgba(226,232,240,.75));
+  background-size: 200% 100%;
+  animation: skeletonShift 1.4s ease-in-out infinite;
+}
+
+.summary-skeleton-value{
+  width: 72%;
+  height: 24px;
+}
+
+@keyframes skeletonShift{
+  0%{ background-position: 200% 0; }
+  100%{ background-position: -200% 0; }
+}
 
 @media (max-width: 1200px){
   .summary{ grid-template-columns: repeat(2, minmax(0, 1fr)); }

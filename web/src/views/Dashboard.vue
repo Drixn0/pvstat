@@ -1,8 +1,9 @@
 <script setup>
-import { ref, reactive, onMounted, computed, nextTick } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { fetchGenerationByMonth, fetchHouseholds, upsertGeneration } from '../api/pvstat'
+import { fetchGenerationByMonth, fetchGenerationSummary, fetchHouseholds, upsertGeneration } from '../api/pvstat'
 import { useDashboardStats } from '../composables/useDashboardStats'
 import { useHouseholdManagement } from '../composables/useHouseholdManagement'
 import DashboardEmptyState from '../components/DashboardEmptyState.vue'
@@ -11,8 +12,11 @@ import DashboardTotalCard from '../components/DashboardTotalCard.vue'
 import HouseholdCard from '../components/HouseholdCard.vue'
 import UserFormDialog from '../components/UserFormDialog.vue'
 
+const route = useRoute()
+const router = useRouter()
 const households = ref([])
-const month = ref(dayjs().format('YYYY-MM'))
+const monthlySummary = ref(null)
+const month = ref(String(route.query.month || dayjs().format('YYYY-MM')))
 const pageLoading = ref(false)
 const monthLoading = ref(false)
 const loadError = ref('')
@@ -20,6 +24,9 @@ const savingCells = reactive({})
 
 const isPageBusy = computed(() => {
   return pageLoading.value || monthLoading.value
+})
+const isInitialLoading = computed(() => {
+  return pageLoading.value && households.value.length === 0
 })
 
 // ====== 只显示当月天数 ======
@@ -32,7 +39,7 @@ const daysInMonth = computed(() => {
 })
 
 // ====== 跳转到某一天 ======
-const jumpDay = ref('01')
+const jumpDay = ref(String(route.query.day || '01').padStart(2, '0'))
 
 // scroll refs
 const scrollRefMap = new Map()
@@ -81,6 +88,16 @@ function goToday() {
 onMounted(async () => {
   await initializePage()
 })
+
+watch([month, jumpDay], async () => {
+  await router.replace({
+    query: {
+      ...route.query,
+      month: month.value !== dayjs().format('YYYY-MM') ? month.value : undefined,
+      day: jumpDay.value !== '01' ? jumpDay.value : undefined
+    }
+  })
+}, { flush: 'post' })
 
 function getErrorMessage(error, fallback = '操作失败，请稍后重试') {
   return error?.response?.data?.error || error?.message || fallback
@@ -141,7 +158,7 @@ async function loadAll() {
     ...h,
     days: {}
   }))
-  await loadGeneration()
+  await Promise.all([loadGeneration(), loadGenerationSummary()])
 }
 
 async function loadGeneration() {
@@ -157,6 +174,10 @@ async function loadGeneration() {
     const user = usersById.get(g.household_id)
     if (user) user.days[day] = Number(g.kwh) || 0
   })
+}
+
+async function loadGenerationSummary() {
+  monthlySummary.value = await fetchGenerationSummary(month.value)
 }
 
 async function saveKwh(userId, day, value) {
@@ -198,7 +219,7 @@ const {
   summaryMonthAmount,
   getUserStats,
   getDailyTotals
-} = useDashboardStats(households, daysInMonth)
+} = useDashboardStats(households, daysInMonth, monthlySummary)
 
 const monthLabel = computed(() => {
   const m = Number(month.value?.slice(5, 7) || 0)
@@ -253,13 +274,52 @@ async function onMonthChange() {
     monthLoading.value = false
   }
 }
+
+function exportMonthlyDetails() {
+  const rows = []
+  households.value.forEach((user) => {
+    daysInMonth.value.forEach((day) => {
+      const date = `${month.value}-${day}`
+      const kwh = getKwh(user, day)
+      const perKw = getPerKw(user, day)
+      const amount = getAmount(user, day)
+      rows.push([
+        month.value,
+        date,
+        user.id,
+        `"${String(user.name || '').replaceAll('"', '""')}"`,
+        Number(user.capacity_kw || 0).toFixed(2),
+        Number(user.price_per_kwh || 0).toFixed(2),
+        kwh.toFixed(2),
+        perKw.toFixed(3),
+        amount.toFixed(2)
+      ])
+    })
+  })
+
+  const csv = [
+    ['月份', '日期', '用户ID', '户名', '功率(kW)', '电价(元/度)', '发电量(kWh)', '每kW发电量', '金额(元)'].join(','),
+    ...rows.map((row) => row.join(','))
+  ].join('\n')
+
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `发电明细-${month.value}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+  ElMessage.success(`已导出 ${monthLabel.value} 发电明细`)
+}
 </script>
 
 <template>
   <div class="page">
-    <div v-if="isPageBusy" class="page-mask">
+    <div v-if="monthLoading && !isInitialLoading" class="page-mask">
       <div class="page-mask-card">
-        <div class="page-mask-title">{{ pageLoading ? '正在加载数据' : '正在切换月份' }}</div>
+        <div class="page-mask-title">正在切换月份</div>
         <div class="page-mask-sub">请稍候，正在同步最新的用户与发电数据。</div>
       </div>
     </div>
@@ -270,6 +330,7 @@ async function onMonthChange() {
       :month-label="monthLabel"
       :days-in-month="daysInMonth"
       :is-page-busy="isPageBusy"
+      :loading="isInitialLoading"
       :households-count="households.length"
       :total-capacity-kw="totalCapacityKw"
       :summary-month-kwh="summaryMonthKwh"
@@ -277,8 +338,35 @@ async function onMonthChange() {
       @month-change="onMonthChange"
       @jump="scrollAllToDay"
       @today="goToday"
+      @export="exportMonthlyDetails"
       @create="openCreateDialog"
     />
+
+    <div v-if="isInitialLoading" class="dashboard-skeleton-list">
+      <div class="dashboard-skeleton-card" v-for="idx in 2" :key="`dashboard-skeleton-${idx}`">
+        <div class="dashboard-skeleton-header">
+          <div class="dashboard-skeleton-line wide"></div>
+          <div class="dashboard-skeleton-actions">
+            <div class="dashboard-skeleton-pill"></div>
+            <div class="dashboard-skeleton-pill"></div>
+          </div>
+        </div>
+        <div class="dashboard-skeleton-stats">
+          <div class="dashboard-skeleton-stat" v-for="n in 3" :key="`stat-${idx}-${n}`"></div>
+        </div>
+        <div class="dashboard-skeleton-grid">
+          <div class="dashboard-skeleton-col head"></div>
+          <div class="dashboard-skeleton-col" v-for="n in 6" :key="`col-${idx}-${n}`"></div>
+        </div>
+      </div>
+      <div class="dashboard-skeleton-total">
+        <div class="dashboard-skeleton-line wide"></div>
+        <div class="dashboard-skeleton-grid">
+          <div class="dashboard-skeleton-col head"></div>
+          <div class="dashboard-skeleton-col" v-for="n in 7" :key="`total-col-${n}`"></div>
+        </div>
+      </div>
+    </div>
 
     <div v-if="loadError" class="error-banner">
       <div class="error-title">数据加载遇到问题</div>
@@ -301,7 +389,7 @@ async function onMonthChange() {
     />
 
     <!-- 用户卡片 -->
-    <div v-if="hasHouseholds" class="grid">
+    <div v-if="hasHouseholds && !isInitialLoading" class="grid">
       <household-card
         v-for="u in households"
         :key="u.id"
@@ -325,6 +413,7 @@ async function onMonthChange() {
     </div>
 
     <dashboard-total-card
+      v-if="!isInitialLoading"
       :has-households="hasHouseholds"
       :grand-totals="grandTotals"
       :days-in-month="daysInMonth"
@@ -424,6 +513,92 @@ async function onMonthChange() {
 }
 
 .grid{ display:flex; flex-direction: column; gap: 12px; }
+
+.dashboard-skeleton-list{
+  display:flex;
+  flex-direction:column;
+  gap: 14px;
+}
+
+.dashboard-skeleton-card,
+.dashboard-skeleton-total{
+  border: 1px solid rgba(15,23,42,.06);
+  background: rgba(255,255,255,.74);
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow: 0 14px 34px rgba(15,23,42,.08);
+}
+
+.dashboard-skeleton-header,
+.dashboard-skeleton-actions,
+.dashboard-skeleton-stats,
+.dashboard-skeleton-grid{
+  display:flex;
+  gap: 12px;
+}
+
+.dashboard-skeleton-header{
+  justify-content:space-between;
+  align-items:center;
+}
+
+.dashboard-skeleton-actions{
+  gap: 10px;
+}
+
+.dashboard-skeleton-line,
+.dashboard-skeleton-pill,
+.dashboard-skeleton-stat,
+.dashboard-skeleton-col{
+  background: linear-gradient(90deg, rgba(226,232,240,.75), rgba(248,250,252,.98), rgba(226,232,240,.75));
+  background-size: 200% 100%;
+  animation: dashboardSkeletonShift 1.4s ease-in-out infinite;
+}
+
+.dashboard-skeleton-line{
+  height: 18px;
+  border-radius: 999px;
+}
+
+.dashboard-skeleton-line.wide{
+  width: 220px;
+}
+
+.dashboard-skeleton-pill{
+  width: 88px;
+  height: 36px;
+  border-radius: 999px;
+}
+
+.dashboard-skeleton-stats{
+  margin-top: 14px;
+}
+
+.dashboard-skeleton-stat{
+  flex: 1 1 0;
+  height: 74px;
+  border-radius: 16px;
+}
+
+.dashboard-skeleton-grid{
+  margin-top: 16px;
+  overflow:hidden;
+}
+
+.dashboard-skeleton-col{
+  flex: 1 1 0;
+  height: 118px;
+  border-radius: 14px;
+}
+
+.dashboard-skeleton-col.head{
+  max-width: 110px;
+}
+
+@keyframes dashboardSkeletonShift{
+  0%{ background-position: 200% 0; }
+  100%{ background-position: -200% 0; }
+}
 
 /* ===== Centered Footer Card ===== */
 .footer-card{

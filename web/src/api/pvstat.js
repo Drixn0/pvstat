@@ -20,6 +20,11 @@ export async function deleteHousehold(id) {
   return data
 }
 
+export async function deleteHouseholdsBatch(ids) {
+  const { data } = await apiClient.post('/households/batch-delete', { ids })
+  return data
+}
+
 export async function fetchHouseholdHistorySummary(id) {
   const { data } = await apiClient.get(`/households/${id}/history-summary`)
   return data
@@ -27,6 +32,13 @@ export async function fetchHouseholdHistorySummary(id) {
 
 export async function fetchGenerationByMonth(month) {
   const { data } = await apiClient.get('/generation', {
+    params: { month }
+  })
+  return data
+}
+
+export async function fetchGenerationSummary(month) {
+  const { data } = await apiClient.get('/generation/summary', {
     params: { month }
   })
   return data

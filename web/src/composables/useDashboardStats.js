@@ -12,14 +12,18 @@ function summaryDisplay(hasHouseholds, hasGenerationData, value, unit, emptyText
   return { text: Number(value).toFixed(2), unit }
 }
 
-export function useDashboardStats(households, daysInMonth) {
-  const totalCapacityKw = computed(() => {
+export function useDashboardStats(households, daysInMonth, monthlySummary) {
+  const localTotalCapacityKw = computed(() => {
     return households.value.reduce((sum, household) => {
       return sum + Number(household.capacity_kw || 0)
     }, 0)
   })
+  const totalCapacityKw = computed(() => {
+    const summaryValue = Number(monthlySummary?.value?.totalCapacityKw)
+    return Number.isFinite(summaryValue) ? summaryValue : localTotalCapacityKw.value
+  })
 
-  const userStatsById = computed(() => {
+  const localUserStatsById = computed(() => {
     const stats = new Map()
 
     households.value.forEach((household) => {
@@ -38,8 +42,19 @@ export function useDashboardStats(households, daysInMonth) {
 
     return stats
   })
+  const userStatsById = computed(() => {
+    const rows = monthlySummary?.value?.userStats
+    if (Array.isArray(rows)) {
+      return new Map(rows.map((row) => [row.householdId, {
+        monthTotalKwh: Number(row.monthTotalKwh) || 0,
+        monthTotalAmount: Number(row.monthTotalAmount) || 0,
+        monthEqHours: Number(row.monthEqHours) || 0
+      }]))
+    }
+    return localUserStatsById.value
+  })
 
-  const dailyTotals = computed(() => {
+  const localDailyTotals = computed(() => {
     const totals = new Map()
     daysInMonth.value.forEach((day) => {
       totals.set(day, { kwh: 0, amount: 0 })
@@ -58,8 +73,25 @@ export function useDashboardStats(households, daysInMonth) {
 
     return totals
   })
+  const dailyTotals = computed(() => {
+    const rows = monthlySummary?.value?.dailyTotals
+    if (Array.isArray(rows)) {
+      const totals = new Map()
+      daysInMonth.value.forEach((day) => {
+        totals.set(day, { kwh: 0, amount: 0 })
+      })
+      rows.forEach((row) => {
+        totals.set(String(row.day).padStart(2, '0'), {
+          kwh: Number(row.kwh) || 0,
+          amount: Number(row.amount) || 0
+        })
+      })
+      return totals
+    }
+    return localDailyTotals.value
+  })
 
-  const grandTotals = computed(() => {
+  const localGrandTotals = computed(() => {
     let kwh = 0
     let amount = 0
 
@@ -69,6 +101,16 @@ export function useDashboardStats(households, daysInMonth) {
     })
 
     return { kwh, amount }
+  })
+  const grandTotals = computed(() => {
+    const summaryTotals = monthlySummary?.value?.grandTotals
+    if (summaryTotals) {
+      return {
+        kwh: Number(summaryTotals.kwh) || 0,
+        amount: Number(summaryTotals.amount) || 0
+      }
+    }
+    return localGrandTotals.value
   })
 
   const hasHouseholds = computed(() => households.value.length > 0)

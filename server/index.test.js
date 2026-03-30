@@ -26,6 +26,32 @@ test('rejects invalid month query', async () => {
   assert.equal(requireMonth('2026-03'), '2026-03')
 })
 
+test('schema creates indexes for household and generation lookups', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvstat-test-'))
+  const dbPath = path.join(tmpDir, 'test.db')
+  const db = new Database(dbPath)
+  initSchema(db)
+
+  try {
+    const indexes = db.prepare(`
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'index'
+      ORDER BY name ASC
+    `).all().map((row) => row.name)
+
+    assert.deepEqual(indexes, [
+      'idx_generation_date',
+      'idx_generation_household_date',
+      'idx_households_name',
+      'sqlite_autoindex_generation_1'
+    ])
+  } finally {
+    db.close()
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+})
+
 test('deleting a household also removes generation rows', async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvstat-test-'))
   const dbPath = path.join(tmpDir, 'test.db')
@@ -54,6 +80,63 @@ test('deleting a household also removes generation rows', async () => {
     assert.equal(countGeneration.get().count, 0)
   } finally {
     db.close()
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+})
+
+test('batch deleting households removes all requested rows', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvstat-test-'))
+  const dbPath = path.join(tmpDir, 'test.db')
+  const svc = createApp({ dbPath })
+
+  try {
+    const insertHousehold = svc.db.prepare(`
+      INSERT INTO households (name, capacity_kw, price_per_kwh)
+      VALUES (?, ?, ?)
+    `)
+    const first = insertHousehold.run('甲', 10, 1)
+    const second = insertHousehold.run('乙', 12, 1.1)
+
+    const req = {
+      method: 'POST',
+      url: '/households/batch-delete',
+      headers: { 'content-type': 'application/json' },
+      body: { ids: [first.lastInsertRowid, second.lastInsertRowid] }
+    }
+    const res = {
+      statusCode: 200,
+      headers: {},
+      body: '',
+      setHeader(name, value) {
+        this.headers[name] = value
+      },
+      getHeader(name) {
+        return this.headers[name]
+      },
+      status(code) {
+        this.statusCode = code
+        return this
+      },
+      json(payload) {
+        this.body = payload
+        return this
+      }
+    }
+
+    await new Promise((resolve, reject) => {
+      svc.app.handle(req, res, (error) => {
+        if (error) reject(error)
+        else resolve()
+      })
+      if (res.body) resolve()
+    })
+
+    const count = svc.db.prepare('SELECT COUNT(*) AS count FROM households').get().count
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.body.deletedCount, 2)
+    assert.equal(count, 0)
+  } finally {
+    svc.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })
   }
 })
@@ -172,6 +255,77 @@ test('household history summary aggregates monthly generation', async () => {
     assert.equal(res.body.months[0].filledDays, 1)
     assert.equal(res.body.months[1].month, '2026-01')
     assert.equal(res.body.months[1].totalKwh, 24)
+  } finally {
+    svc.close()
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+})
+
+test('monthly generation summary returns aggregate stats', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvstat-test-'))
+  const dbPath = path.join(tmpDir, 'test.db')
+  const svc = createApp({ dbPath })
+
+  try {
+    const insertHousehold = svc.db.prepare(`
+      INSERT INTO households (name, capacity_kw, price_per_kwh)
+      VALUES (?, ?, ?)
+    `)
+    const first = insertHousehold.run('甲', 10, 1)
+    const second = insertHousehold.run('乙', 5, 2)
+    const insertGeneration = svc.db.prepare(`
+      INSERT INTO generation (household_id, date, kwh)
+      VALUES (?, ?, ?)
+    `)
+
+    insertGeneration.run(first.lastInsertRowid, '2026-03-01', 10)
+    insertGeneration.run(first.lastInsertRowid, '2026-03-02', 20)
+    insertGeneration.run(second.lastInsertRowid, '2026-03-02', 5)
+    insertGeneration.run(second.lastInsertRowid, '2026-04-01', 99)
+
+    const req = {
+      method: 'GET',
+      url: '/generation/summary?month=2026-03',
+      headers: {},
+      query: { month: '2026-03' }
+    }
+    const res = {
+      statusCode: 200,
+      headers: {},
+      body: '',
+      setHeader(name, value) {
+        this.headers[name] = value
+      },
+      getHeader(name) {
+        return this.headers[name]
+      },
+      status(code) {
+        this.statusCode = code
+        return this
+      },
+      json(payload) {
+        this.body = payload
+        return this
+      }
+    }
+
+    await new Promise((resolve, reject) => {
+      svc.app.handle(req, res, (error) => {
+        if (error) reject(error)
+        else resolve()
+      })
+      if (res.body) resolve()
+    })
+
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.body.householdCount, 2)
+    assert.equal(res.body.totalCapacityKw, 15)
+    assert.equal(res.body.grandTotals.kwh, 35)
+    assert.equal(res.body.grandTotals.amount, 40)
+    assert.equal(res.body.userStats[0].monthEqHours, 3)
+    assert.equal(res.body.userStats[1].monthTotalAmount, 10)
+    assert.equal(res.body.dailyTotals[1].day, '02')
+    assert.equal(res.body.dailyTotals[1].amount, 30)
   } finally {
     svc.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })

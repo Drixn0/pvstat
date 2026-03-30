@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElDialog, ElMessage, ElMessageBox } from 'element-plus'
-import { deleteHousehold, fetchHouseholdHistorySummary, fetchHouseholds } from '../api/pvstat'
+import { deleteHouseholdsBatch, fetchHouseholdHistorySummary, fetchHouseholds } from '../api/pvstat'
 import UserFormDialog from '../components/UserFormDialog.vue'
 import { useHouseholdManagement } from '../composables/useHouseholdManagement'
 
@@ -20,6 +20,7 @@ const bulkDeleting = ref(false)
 const historyDialogVisible = ref(false)
 const historyLoading = ref(false)
 const historyData = ref(null)
+const isInitialLoading = computed(() => loading.value && households.value.length === 0)
 
 function getErrorMessage(error, fallback = '操作失败，请稍后重试') {
   return error?.response?.data?.error || error?.message || fallback
@@ -207,10 +208,8 @@ async function removeSelectedUsers() {
 
   bulkDeleting.value = true
   try {
-    for (const id of ids) {
-      await deleteHousehold(id)
-    }
-    ElMessage.success(`已删除 ${ids.length} 个用户`)
+    const result = await deleteHouseholdsBatch(ids)
+    ElMessage.success(`已删除 ${result.deletedCount || ids.length} 个用户`)
     selectedIds.value = []
     await loadAll()
     normalizePage()
@@ -303,26 +302,46 @@ watch([keyword, sortKey, pageSize, currentPage], async () => {
     <section class="summary">
       <div class="summary-card">
         <div class="summary-label">用户总数</div>
-        <div class="summary-value">{{ households.length }}</div>
+        <div v-if="isInitialLoading" class="summary-skeleton"></div>
+        <div v-else class="summary-value">{{ households.length }}</div>
       </div>
       <div class="summary-card">
         <div class="summary-label">总装机功率</div>
-        <div class="summary-value">{{ formatNumber(totalCapacityKw) }} <span class="unit">kW</span></div>
+        <div v-if="isInitialLoading" class="summary-skeleton"></div>
+        <div v-else class="summary-value">{{ formatNumber(totalCapacityKw) }} <span class="unit">kW</span></div>
       </div>
       <div class="summary-card">
         <div class="summary-label">平均电价</div>
-        <div class="summary-value">¥{{ formatNumber(averagePrice) }} <span class="unit">元/度</span></div>
+        <div v-if="isInitialLoading" class="summary-skeleton"></div>
+        <div v-else class="summary-value">¥{{ formatNumber(averagePrice) }} <span class="unit">元/度</span></div>
       </div>
       <div class="summary-card">
         <div class="summary-label">最大功率用户</div>
-        <div class="summary-value summary-text">
+        <div v-if="isInitialLoading" class="summary-skeleton"></div>
+        <div v-else class="summary-value summary-text">
           {{ highestCapacityUser ? highestCapacityUser.name : '暂无' }}
           <span v-if="highestCapacityUser" class="unit">{{ formatNumber(highestCapacityUser.capacity_kw) }} kW</span>
         </div>
       </div>
       <div class="summary-card">
         <div class="summary-label">已勾选用户</div>
-        <div class="summary-value">{{ selectedIds.length }}</div>
+        <div v-if="isInitialLoading" class="summary-skeleton"></div>
+        <div v-else class="summary-value">{{ selectedIds.length }}</div>
+      </div>
+    </section>
+
+    <section v-if="isInitialLoading" class="user-skeleton-grid">
+      <div class="user-skeleton-card" v-for="idx in 4" :key="`user-skeleton-${idx}`">
+        <div class="user-skeleton-top">
+          <div class="user-skeleton-line large"></div>
+          <div class="user-skeleton-actions">
+            <div class="user-skeleton-pill"></div>
+            <div class="user-skeleton-pill"></div>
+          </div>
+        </div>
+        <div class="user-skeleton-metrics">
+          <div class="user-skeleton-box" v-for="n in 2" :key="`metric-${idx}-${n}`"></div>
+        </div>
       </div>
     </section>
 
@@ -619,6 +638,16 @@ watch([keyword, sortKey, pageSize, currentPage], async () => {
   padding: 16px 18px;
 }
 
+.summary-skeleton{
+  margin-top: 8px;
+  width: 72%;
+  height: 24px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(226,232,240,.75), rgba(248,250,252,.98), rgba(226,232,240,.75));
+  background-size: 200% 100%;
+  animation: userSkeletonShift 1.4s ease-in-out infinite;
+}
+
 .summary-label,
 .metric-label{
   font-size: 12px;
@@ -732,6 +761,71 @@ watch([keyword, sortKey, pageSize, currentPage], async () => {
   display:grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.user-skeleton-grid{
+  margin-top: 16px;
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.user-skeleton-card{
+  border-radius: 20px;
+  background: rgba(255,255,255,.78);
+  border: 1px solid rgba(15,23,42,.08);
+  box-shadow: 0 16px 40px rgba(15,23,42,.08);
+  padding: 18px;
+}
+
+.user-skeleton-top,
+.user-skeleton-actions,
+.user-skeleton-metrics{
+  display:flex;
+  gap: 12px;
+}
+
+.user-skeleton-top{
+  align-items:center;
+  justify-content:space-between;
+}
+
+.user-skeleton-line,
+.user-skeleton-pill,
+.user-skeleton-box{
+  background: linear-gradient(90deg, rgba(226,232,240,.75), rgba(248,250,252,.98), rgba(226,232,240,.75));
+  background-size: 200% 100%;
+  animation: userSkeletonShift 1.4s ease-in-out infinite;
+}
+
+.user-skeleton-line{
+  height: 22px;
+  border-radius: 999px;
+}
+
+.user-skeleton-line.large{
+  width: 160px;
+}
+
+.user-skeleton-pill{
+  width: 78px;
+  height: 36px;
+  border-radius: 999px;
+}
+
+.user-skeleton-metrics{
+  margin-top: 16px;
+}
+
+.user-skeleton-box{
+  flex: 1 1 0;
+  height: 92px;
+  border-radius: 16px;
+}
+
+@keyframes userSkeletonShift{
+  0%{ background-position: 200% 0; }
+  100%{ background-position: -200% 0; }
 }
 
 .user-card{
@@ -1042,6 +1136,7 @@ watch([keyword, sortKey, pageSize, currentPage], async () => {
 
   .summary,
   .list-grid,
+  .user-skeleton-grid,
   .metric-grid,
   .history-summary{
     grid-template-columns: 1fr;
