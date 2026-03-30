@@ -60,7 +60,7 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
         <div class="app-sub">顶部看全局，下面直接连续录入，减少来回切换和视线负担。</div>
       </div>
 
-      <div class="nav-right">
+      <div class="nav-right toolbar-shell">
         <div class="control-card month">
           <div class="label"><el-icon><Calendar /></el-icon> 月份</div>
           <el-date-picker
@@ -78,7 +78,7 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 
         <div class="control-card jump">
           <div class="label"><el-icon><Aim /></el-icon> 跳到</div>
-          <div class="jump-row">
+          <div class="jump-row action-row">
             <el-select
               :model-value="jumpDay"
               class="ios-select"
@@ -98,44 +98,58 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
           </div>
         </div>
 
-        <el-button class="ios-btn ios-btn-primary create-btn" :disabled="isPageBusy || loading" @click="$emit('create')">
-          <el-icon><Plus /></el-icon>
-          {{ canManage ? '新增用户' : '登录后新增' }}
-        </el-button>
+        <div class="control-card create-card">
+          <div class="label"><el-icon><Plus /></el-icon> 用户</div>
+          <el-button class="ios-btn ios-btn-primary create-btn" :disabled="isPageBusy || loading" @click="$emit('create')">
+            {{ canManage ? '新增用户' : '登录后新增' }}
+          </el-button>
+        </div>
       </div>
     </div>
 
     <div class="summary">
-      <div class="summary-card accent">
-        <div class="summary-label">统计月份</div>
-        <div v-if="loading" class="summary-skeleton summary-skeleton-value"></div>
-        <div v-else class="summary-value">{{ monthLabel }}</div>
-      </div>
-      <div class="summary-card">
-        <div class="summary-label">用户数量</div>
-        <div v-if="loading" class="summary-skeleton summary-skeleton-value"></div>
-        <div v-else class="summary-value">{{ householdsCount }}</div>
-      </div>
-      <div class="summary-card">
-        <div class="summary-label">用户总功率</div>
-        <div v-if="loading" class="summary-skeleton summary-skeleton-value"></div>
-        <div v-else class="summary-value">
-          {{ totalCapacityKw.toFixed(2) }} <span class="unit">kW</span>
+      <div class="summary-side">
+        <div class="summary-card accent compact">
+          <div class="summary-label">统计月份</div>
+          <div v-if="loading" class="summary-skeleton summary-skeleton-value"></div>
+          <div v-else class="summary-value">{{ monthLabel }}</div>
+        </div>
+        <div class="summary-card compact">
+          <div class="summary-label">用户数量</div>
+          <div v-if="loading" class="summary-skeleton summary-skeleton-value"></div>
+          <div v-else class="summary-value">{{ householdsCount }}</div>
+        </div>
+        <div class="summary-card compact">
+          <div class="summary-label">用户总功率</div>
+          <div v-if="loading" class="summary-skeleton summary-skeleton-value"></div>
+          <div v-else class="summary-value">
+            {{ totalCapacityKw.toFixed(2) }} <span class="unit">kW</span>
+          </div>
         </div>
       </div>
-      <div class="summary-card highlight">
-        <div class="summary-label">{{ monthLabel }} 累计发电量</div>
-        <div v-if="loading" class="summary-skeleton summary-skeleton-value"></div>
-        <div v-else class="summary-value">
-          {{ summaryMonthKwh.text }} <span class="unit">{{ summaryMonthKwh.unit }}</span>
+
+      <div class="summary-main">
+        <div class="summary-card hero-card highlight emphasis">
+          <div class="hero-meta">
+            <div class="summary-label">{{ monthLabel }} 累计发电量</div>
+            <div class="hero-note">本月累计总输出</div>
+          </div>
+          <div v-if="loading" class="summary-skeleton hero-skeleton"></div>
+          <div v-else class="hero-value">
+            {{ summaryMonthKwh.text }} <span class="unit">{{ summaryMonthKwh.unit }}</span>
+          </div>
         </div>
-      </div>
-      <div class="summary-card highlight money-card">
-        <div class="summary-label">{{ monthLabel }} 累计发电收益</div>
-        <div v-if="loading" class="summary-skeleton summary-skeleton-value"></div>
-        <div v-else class="summary-value money">
-          {{ summaryMonthAmount.prefix }}{{ summaryMonthAmount.text }}
-          <span class="unit">{{ summaryMonthAmount.unit }}</span>
+
+        <div class="summary-card hero-card money-card emphasis">
+          <div class="hero-meta">
+            <div class="summary-label">{{ monthLabel }} 累计发电收益</div>
+            <div class="hero-note">按当前电价估算</div>
+          </div>
+          <div v-if="loading" class="summary-skeleton hero-skeleton"></div>
+          <div v-else class="hero-value money">
+            {{ summaryMonthAmount.prefix }}{{ summaryMonthAmount.text }}
+            <span class="unit">{{ summaryMonthAmount.unit }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -176,17 +190,29 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 
 .nav-right{
   display:flex;
-  align-items:flex-end;
-  gap: 10px;
+  align-items:stretch;
+  gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
 
+.toolbar-shell{
+  padding: 6px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(244,247,255,.86), rgba(255,255,255,.78));
+  border: 1px solid rgba(184,198,226,.28);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92);
+}
+
 .control-card{
-  padding: 10px 12px;
+  min-height: 84px;
+  padding: 8px 12px 10px;
   border-radius: 18px;
-  background: rgba(246,248,255,.78);
-  border: 1px solid rgba(184,198,226,.35);
+  background: rgba(255,255,255,.72);
+  border: 1px solid rgba(184,198,226,.24);
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
 }
 
 .label{
@@ -195,7 +221,7 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
   gap: 6px;
   font-size: 12px;
   color: #64748b;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .ios-picker :deep(.el-input__wrapper),
@@ -208,6 +234,9 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 
 .ios-select{ width: 92px; }
 .jump-row{ display:flex; gap:8px; align-items:center; }
+.action-row{
+  min-height: 40px;
+}
 
 .ios-btn{
   border-radius: 999px;
@@ -231,13 +260,30 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 }
 
 .create-btn{
-  min-width: 126px;
+  min-width: 140px;
+  width: 100%;
+}
+
+.create-card{
+  min-width: 168px;
 }
 
 .summary{
   display:grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: minmax(260px, 1.1fr) minmax(420px, 2fr);
+  gap: 12px;
+}
+
+.summary-side{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.summary-main{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .summary-card{
@@ -246,6 +292,8 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
   border-radius: 18px;
   padding: 12px 14px 13px;
   min-height: 86px;
+  position: relative;
+  overflow: hidden;
 }
 
 .summary-card.accent{
@@ -260,7 +308,46 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
   background: linear-gradient(135deg, rgba(255,243,244,.96), rgba(255,255,255,.92));
 }
 
+.summary-card.compact{
+  min-height: 78px;
+}
+
+.hero-card{
+  min-height: 118px;
+  padding: 16px 18px 18px;
+}
+
+.summary-card.emphasis{
+  box-shadow: 0 10px 24px rgba(78,111,196,.08);
+}
+
+.summary-card::after{
+  content:'';
+  position:absolute;
+  inset:auto 0 0 0;
+  height: 3px;
+  opacity: .5;
+  background: linear-gradient(90deg, rgba(96,132,255,.28), rgba(96,132,255,0));
+}
+
+.summary-card.money-card::after{
+  background: linear-gradient(90deg, rgba(239,68,68,.28), rgba(239,68,68,0));
+}
+
 .summary-label{ font-size: 12px; color: #64748b; }
+
+.hero-meta{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap: 10px;
+}
+
+.hero-note{
+  font-size: 11px;
+  color:#7b89a3;
+  white-space: nowrap;
+}
 
 .summary-value{
   margin-top: 6px;
@@ -272,6 +359,18 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
 
 .summary-value.money{ color:#d33; }
 .unit{ font-size: 11px; color:#64748b; font-weight:700; margin-left:4px; }
+
+.hero-value{
+  margin-top: 18px;
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 950;
+  color:#10203f;
+}
+
+.hero-value.money{
+  color:#d33;
+}
 
 .summary-skeleton{
   margin-top: 8px;
@@ -286,13 +385,26 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
   height: 24px;
 }
 
+.hero-skeleton{
+  margin-top: 18px;
+  width: 78%;
+  height: 38px;
+}
+
 @keyframes skeletonShift{
   0%{ background-position: 200% 0; }
   100%{ background-position: -200% 0; }
 }
 
 @media (max-width: 1200px){
-  .summary{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .summary{
+    grid-template-columns: 1fr;
+  }
+
+  .summary-side,
+  .summary-main{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 960px){
@@ -307,6 +419,27 @@ defineEmits(['update:month', 'update:jumpDay', 'month-change', 'jump', 'today', 
   .nav-right{
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .toolbar-shell{
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  .control-card,
+  .create-card{
+    width: 100%;
+  }
+
+  .jump-row{
+    flex-wrap: wrap;
+  }
+
+  .summary-side,
+  .summary-main{
+    grid-template-columns: 1fr;
   }
 }
 </style>

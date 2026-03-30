@@ -59,16 +59,27 @@ defineEmits(['primary', 'secondary'])
 
 <style scoped>
 .empty-state{
-  margin: 14px 0;
-  padding: 34px 24px;
+  margin: 12px 0;
+  padding: 30px 24px;
   border-radius: 24px;
   background:
     radial-gradient(600px 240px at 15% 0%, rgba(59,130,246,.12), transparent 60%),
     radial-gradient(520px 240px at 85% 10%, rgba(236,72,153,.10), transparent 58%),
     rgba(255,255,255,.78);
   border: 1px solid rgba(15,23,42,.08);
-  box-shadow: 0 18px 50px rgba(15,23,42,.10);
+  box-shadow: 0 14px 34px rgba(15,23,42,.08);
   text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.empty-state::after{
+  content:'';
+  position:absolute;
+  inset:auto 24px 0;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(59,130,246,.22), rgba(236,72,153,.18), rgba(59,130,246,0));
 }
 
 .empty-visual{
@@ -77,14 +88,14 @@ defineEmits(['primary', 'secondary'])
 }
 
 .empty-title{
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 950;
   color: #0f172a;
 }
 
 .empty-text{
   width: min(560px, 100%);
-  margin: 10px auto 0;
+  margin: 12px auto 0;
   font-size: 14px;
   line-height: 1.7;
   color: #64748b;

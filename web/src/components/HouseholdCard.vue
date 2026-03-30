@@ -183,17 +183,17 @@ async function handleEnter(day) {
 <style scoped>
 .user-card{
   border-radius: 22px;
-  padding: 12px;
-  box-shadow: 0 12px 28px rgba(15,23,42,.08);
+  padding: 10px;
+  box-shadow: 0 10px 22px rgba(15,23,42,.07);
 }
 
 .card-head{
   display:flex;
   align-items:stretch;
   justify-content: space-between;
-  gap: 14px;
-  padding: 12px;
-  border-radius: 22px;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 20px;
   background: linear-gradient(135deg, rgba(255,255,255,.88), rgba(244,248,255,.82));
   border: 1px solid rgba(15,23,42,.05);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.95);
@@ -207,9 +207,9 @@ async function handleEnter(day) {
 .identity-card{
   display:flex;
   align-items:center;
-  gap: 14px;
+  gap: 12px;
   height: 100%;
-  padding: 6px 4px;
+  padding: 2px 2px;
 }
 
 .identity-main{
@@ -220,14 +220,14 @@ async function handleEnter(day) {
 }
 
 .name-mark{
-  width: 52px;
-  height: 52px;
-  flex: 0 0 52px;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
   display:flex;
   align-items:center;
   justify-content:center;
-  border-radius: 18px;
-  font-size: 20px;
+  border-radius: 16px;
+  font-size: 18px;
   font-weight: 900;
   color:#1d4ed8;
   background: linear-gradient(135deg, rgba(255,255,255,.98), rgba(223,235,255,.96));
@@ -249,8 +249,8 @@ async function handleEnter(day) {
 }
 
 .name{
-  margin-top: 4px;
-  font-size: 18px;
+  margin-top: 3px;
+  font-size: 17px;
   font-weight: 950;
   color:#0f172a;
   line-height: 1.1;
@@ -259,18 +259,18 @@ async function handleEnter(day) {
 .meta{
   display:flex;
   align-items:center;
-  gap:8px;
+  gap:6px;
   flex-wrap: wrap;
   min-width: 0;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .pill{
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 900;
   color:#0f172a;
   white-space: nowrap;
-  padding: 5px 9px;
+  padding: 4px 8px;
   border-radius: 999px;
   background: rgba(255,255,255,.68);
   border: 1px solid rgba(15,23,42,.08);
@@ -280,15 +280,15 @@ async function handleEnter(day) {
   display:grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   width: min(400px, 100%);
-  gap:8px;
-  padding-left: 12px;
+  gap:6px;
+  padding-left: 10px;
   border-left: 1px solid rgba(184,198,226,.34);
 }
 
 .mini-stat{
   min-width: 0;
-  padding: 12px 12px 11px;
-  border-radius: 18px;
+  padding: 9px 10px 8px;
+  border-radius: 16px;
   background: rgba(255,255,255,.92);
   border: 1px solid rgba(184,198,226,.30);
   color:#0f172a;
@@ -300,22 +300,22 @@ async function handleEnter(day) {
 
 .mini-label{
   display:block;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color:#64748b;
 }
 
 .mini-stat strong{
   display:block;
-  margin-top: 4px;
-  font-size: 14px;
+  margin-top: 3px;
+  font-size: 13px;
   line-height: 1.1;
 }
 
 .mini-unit{
   display:block;
-  margin-top: 4px;
-  font-size: 10px;
+  margin-top: 3px;
+  font-size: 9px;
   font-weight: 700;
   color:#7a8aa8;
 }
@@ -351,7 +351,7 @@ async function handleEnter(day) {
   gap: 6px;
   font-size: 12px;
   font-weight: 900;
-  padding: 8px 11px;
+  padding: 7px 10px;
   border-radius: 999px;
   border: 1px solid rgba(15,23,42,.10);
   background: rgba(255,255,255,.88);
@@ -374,9 +374,9 @@ async function handleEnter(day) {
 }
 
 .entry-shell{
-  margin-top: 10px;
-  padding: 10px;
-  border-radius: 20px;
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 18px;
   background: linear-gradient(180deg, rgba(255,255,255,.72), rgba(245,248,255,.90));
   border: 1px solid rgba(15,23,42,.05);
 }
@@ -386,31 +386,31 @@ async function handleEnter(day) {
   align-items:baseline;
   justify-content:space-between;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   padding: 0 2px;
 }
 
 .day-strip{
   display:flex;
-  gap: 8px;
+  gap: 6px;
   align-items: stretch;
 }
 
 .day-col-head{
-  width: 98px;
-  flex: 0 0 98px;
+  width: 92px;
+  flex: 0 0 92px;
   border: 1px solid rgba(15,23,42,.06);
   background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(249,251,255,.92));
   border-radius: 16px;
-  padding: 9px 9px 9px;
+  padding: 8px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.92);
 }
 
 .day-scroll{
   display:grid;
   grid-auto-flow: column;
-  grid-auto-columns: 92px;
-  gap: 8px;
+  grid-auto-columns: 86px;
+  gap: 6px;
   overflow-x: auto;
   padding-bottom: 4px;
   scroll-behavior: smooth;
@@ -425,16 +425,16 @@ async function handleEnter(day) {
   border: 1px solid rgba(15,23,42,.06);
   background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(249,251,255,.92));
   border-radius: 16px;
-  padding: 9px 9px 9px;
+  padding: 8px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.92);
 }
 
-.day-title{ font-size: 11px; color:#64748b; font-weight: 900; }
+.day-title{ font-size: 10px; color:#64748b; font-weight: 900; }
 
 .cell-box{
   margin-top: 8px;
-  padding: 6px 7px 7px;
-  border-radius: 12px;
+  padding: 5px 6px 6px;
+  border-radius: 11px;
   background: linear-gradient(180deg, rgba(241,245,255,.94), rgba(255,255,255,.92));
   border: 1px solid rgba(184,198,226,.35);
 }
@@ -446,7 +446,7 @@ async function handleEnter(day) {
 
 .cell-label{
   margin-bottom: 4px;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
   color:#6d7f9c;
   line-height: 1.1;
@@ -461,10 +461,10 @@ async function handleEnter(day) {
 }
 
 .head-placeholder{
-  min-height: 32px;
+  min-height: 30px;
   display:flex;
   align-items:center;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 900;
   color:#334155;
   white-space: nowrap;
@@ -472,7 +472,7 @@ async function handleEnter(day) {
 
 .cell-input{ margin-top: 0; }
 .cell-input :deep(.el-input__wrapper){
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(255,255,255,.96);
   box-shadow: none;
   padding: 0 8px;
@@ -486,19 +486,19 @@ async function handleEnter(day) {
 }
 
 .cell-metric{
-  margin-top: 5px;
+  margin-top: 4px;
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap: 6px;
-  padding: 5px 7px;
-  border-radius: 10px;
+  padding: 4px 6px;
+  border-radius: 9px;
   background: rgba(255,255,255,.74);
   min-height: 34px;
 }
 
 .metric-label{
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
   color:#7a8aa8;
   white-space: nowrap;
@@ -507,7 +507,7 @@ async function handleEnter(day) {
 
 .metric-value{
   text-align: right;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 900;
   color:#0f172a;
   white-space: nowrap;
@@ -527,7 +527,7 @@ async function handleEnter(day) {
 .head-cell-metric.money .head-metric-label{
   color:#ef4444;
 }
-.hint{ margin-top: 8px; font-size: 11px; color:#64748b; }
+.hint{ margin-top: 6px; font-size: 10px; color:#64748b; }
 .unit{ font-size: 11px; color:#64748b; font-weight:700; margin-left:4px; }
 
 @media (max-width: 1200px){

@@ -367,10 +367,21 @@ function exportMonthlyDetails() {
       @create="openCreateGuarded"
     />
 
-    <div v-if="!isAuthenticated" class="readonly-banner">
-      <div class="readonly-title">当前为只读模式</div>
-      <div class="readonly-text">未登录时可以查看统计和导出明细，但不能新增、修改、删除或录入发电数据。</div>
-      <button class="readonly-btn" @click="requestManageAuth('登录后才能新增、修改、删除和录入数据')">管理员登录</button>
+    <div v-if="!isAuthenticated || loadError" class="status-stack">
+      <div v-if="!isAuthenticated" class="readonly-banner">
+        <div class="status-copy">
+          <div class="readonly-title">当前为只读模式</div>
+          <div class="readonly-text">未登录时可以查看统计和导出明细，但不能新增、修改、删除或录入发电数据。</div>
+        </div>
+        <button class="readonly-btn" @click="requestManageAuth('登录后才能新增、修改、删除和录入数据')">管理员登录</button>
+      </div>
+
+      <div v-if="loadError" class="error-banner">
+        <div class="status-copy">
+          <div class="error-title">数据加载遇到问题</div>
+          <div class="error-text">{{ loadError }}</div>
+        </div>
+      </div>
     </div>
 
     <div v-if="isInitialLoading" class="dashboard-skeleton-list">
@@ -399,11 +410,6 @@ function exportMonthlyDetails() {
       </div>
     </div>
 
-    <div v-if="loadError" class="error-banner">
-      <div class="error-title">数据加载遇到问题</div>
-      <div class="error-text">{{ loadError }}</div>
-    </div>
-
     <dashboard-empty-state
       v-if="!hasHouseholds && !isPageBusy"
       kind="no-users"
@@ -420,7 +426,16 @@ function exportMonthlyDetails() {
     />
 
     <!-- 用户卡片 -->
-    <div v-if="hasHouseholds && !isInitialLoading" class="grid">
+    <section v-if="hasHouseholds && !isInitialLoading" class="content-section">
+      <div class="section-head">
+        <div>
+          <div class="section-title">用户录入卡片</div>
+          <div class="section-sub">保留卡片式录入体验，支持按用户连续填写当月每日发电量。</div>
+        </div>
+        <div class="section-chip">{{ households.length }} 户</div>
+      </div>
+
+      <div class="grid">
       <household-card
         v-for="u in households"
         :key="u.id"
@@ -443,10 +458,29 @@ function exportMonthlyDetails() {
         @edit="openEditGuarded"
         @delete="removeUserGuarded"
       />
-    </div>
+      </div>
+    </section>
+
+    <section v-if="!isInitialLoading && hasHouseholds" class="content-section total-section">
+      <div class="section-head total-section-head">
+        <div>
+          <div class="section-title">月度合计总览</div>
+          <div class="section-sub">把所有用户的每日发电量和金额叠加，适合快速复核整个月走势。</div>
+        </div>
+        <div class="section-chip neutral">自动汇总</div>
+      </div>
+
+      <dashboard-total-card
+        :has-households="hasHouseholds"
+        :grand-totals="grandTotals"
+        :days-in-month="daysInMonth"
+        :get-daily-totals="getDailyTotals"
+        :set-scroll-ref="setScrollRef"
+      />
+    </section>
 
     <dashboard-total-card
-      v-if="!isInitialLoading"
+      v-else-if="!isInitialLoading"
       :has-households="hasHouseholds"
       :grand-totals="grandTotals"
       :days-in-month="daysInMonth"
@@ -484,12 +518,18 @@ function exportMonthlyDetails() {
 <style scoped>
 /* 背景：iOS/macOS 轻磨砂 */
 .page{
-  padding: 16px;
+  padding: 14px;
   min-height: 100%;
   background: radial-gradient(1200px 600px at 20% 0%, #eef2ff 0%, transparent 60%),
               radial-gradient(900px 500px at 90% 20%, #fdf2f8 0%, transparent 55%),
               #f6f7fb;
   position: relative;
+}
+
+.status-stack{
+  display:grid;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .page-mask{
@@ -525,12 +565,15 @@ function exportMonthlyDetails() {
 }
 
 .error-banner{
-  margin-bottom: 10px;
-  padding: 13px 15px;
+  padding: 12px 14px;
   border-radius: 16px;
   background: rgba(254, 242, 242, .88);
   border: 1px solid rgba(220, 38, 38, .14);
   box-shadow: 0 10px 24px rgba(220, 38, 38, .08);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
 }
 
 .error-title{
@@ -546,41 +589,93 @@ function exportMonthlyDetails() {
 }
 
 .readonly-banner{
-  margin-bottom: 10px;
-  padding: 13px 15px;
+  padding: 12px 14px;
   border-radius: 16px;
   background: rgba(254,249,195,.72);
   border: 1px solid rgba(234,179,8,.22);
   box-shadow: 0 10px 24px rgba(234,179,8,.08);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 14px;
+}
+
+.status-copy{
+  min-width: 0;
 }
 
 .readonly-title{
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 900;
   color:#854d0e;
 }
 
 .readonly-text{
   margin-top: 4px;
-  font-size: 13px;
+  font-size: 12px;
   color:#713f12;
 }
 
 .readonly-btn{
-  margin-top: 10px;
-  height: 36px;
-  padding: 0 14px;
+  height: 34px;
+  padding: 0 12px;
   border-radius: 999px;
   border: none;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 900;
   color:#fff;
   background: linear-gradient(135deg, #d97706 0%, #ea580c 100%);
   box-shadow: 0 10px 24px rgba(234,88,12,.18);
 }
 
-.grid{ display:flex; flex-direction: column; gap: 10px; }
+.content-section{
+  margin-top: 2px;
+}
+
+.section-head{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 2px 2px 0;
+}
+
+.section-title{
+  font-size: 15px;
+  font-weight: 900;
+  color:#14213d;
+}
+
+.section-sub{
+  margin-top: 3px;
+  font-size: 11px;
+  color:#64748b;
+}
+
+.section-chip{
+  height: 28px;
+  padding: 0 10px;
+  display:flex;
+  align-items:center;
+  border-radius: 999px;
+  background: rgba(255,255,255,.8);
+  border: 1px solid rgba(184,198,226,.28);
+  font-size: 11px;
+  font-weight: 800;
+  color:#3451a3;
+}
+
+.section-chip.neutral{
+  color:#52627f;
+}
+
+.total-section{
+  margin-top: 8px;
+}
+
+.grid{ display:flex; flex-direction: column; gap: 8px; }
 
 .dashboard-skeleton-list{
   display:flex;
@@ -670,18 +765,18 @@ function exportMonthlyDetails() {
 
 /* ===== Centered Footer Card ===== */
 .footer-card{
-  margin: 40px auto 28px;
-  max-width: 1400px;
-  padding: 22px 18px;
-  border-radius: 20px;
+  margin: 28px auto 22px;
+  max-width: 720px;
+  padding: 16px 18px;
+  border-radius: 18px;
   text-align: center;
 
-  background: rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.56);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 
   box-shadow:
-    0 20px 60px rgba(0,0,0,0.06),
+    0 12px 28px rgba(0,0,0,0.04),
     inset 0 1px 0 rgba(255,255,255,0.9);
 }
 
@@ -689,7 +784,16 @@ function exportMonthlyDetails() {
   font-size: 14px;
   letter-spacing: 2px;
   font-weight: 600;
-  color: rgba(0,0,0,0.65);
+  color: rgba(0,0,0,0.52);
+}
+
+@media (max-width: 960px){
+  .readonly-banner,
+  .error-banner,
+  .section-head{
+    align-items:flex-start;
+    flex-direction:column;
+  }
 }
 
 </style>
