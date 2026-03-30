@@ -293,7 +293,7 @@ async function onMonthChange() {
     />
 
     <dashboard-empty-state
-      v-else-if="!hasGenerationData && !isPageBusy"
+      v-if="hasHouseholds && !hasGenerationData && !isPageBusy"
       kind="no-generation"
       :month-label="monthLabel"
       @primary="goToday"
@@ -301,7 +301,7 @@ async function onMonthChange() {
     />
 
     <!-- 用户卡片 -->
-    <div v-else class="grid">
+    <div v-if="hasHouseholds" class="grid">
       <household-card
         v-for="u in households"
         :key="u.id"

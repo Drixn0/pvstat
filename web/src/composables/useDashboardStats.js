@@ -80,7 +80,7 @@ export function useDashboardStats(households, daysInMonth) {
       hasGenerationData.value,
       grandTotals.value.kwh,
       'kWh',
-      '先新增用户'
+      '录入后生成'
     )
   })
 
