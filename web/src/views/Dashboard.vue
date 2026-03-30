@@ -484,7 +484,7 @@ function exportMonthlyDetails() {
 <style scoped>
 /* 背景：iOS/macOS 轻磨砂 */
 .page{
-  padding: 18px;
+  padding: 16px;
   min-height: 100%;
   background: radial-gradient(1200px 600px at 20% 0%, #eef2ff 0%, transparent 60%),
               radial-gradient(900px 500px at 90% 20%, #fdf2f8 0%, transparent 55%),
@@ -525,8 +525,8 @@ function exportMonthlyDetails() {
 }
 
 .error-banner{
-  margin-bottom: 14px;
-  padding: 14px 16px;
+  margin-bottom: 10px;
+  padding: 13px 15px;
   border-radius: 16px;
   background: rgba(254, 242, 242, .88);
   border: 1px solid rgba(220, 38, 38, .14);
@@ -546,8 +546,8 @@ function exportMonthlyDetails() {
 }
 
 .readonly-banner{
-  margin-bottom: 14px;
-  padding: 14px 16px;
+  margin-bottom: 10px;
+  padding: 13px 15px;
   border-radius: 16px;
   background: rgba(254,249,195,.72);
   border: 1px solid rgba(234,179,8,.22);
@@ -580,21 +580,21 @@ function exportMonthlyDetails() {
   box-shadow: 0 10px 24px rgba(234,88,12,.18);
 }
 
-.grid{ display:flex; flex-direction: column; gap: 12px; }
+.grid{ display:flex; flex-direction: column; gap: 10px; }
 
 .dashboard-skeleton-list{
   display:flex;
   flex-direction:column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .dashboard-skeleton-card,
 .dashboard-skeleton-total{
   border: 1px solid rgba(15,23,42,.06);
   background: rgba(255,255,255,.74);
-  border-radius: 20px;
-  padding: 16px;
-  box-shadow: 0 14px 34px rgba(15,23,42,.08);
+  border-radius: 22px;
+  padding: 14px;
+  box-shadow: 0 12px 28px rgba(15,23,42,.07);
 }
 
 .dashboard-skeleton-header,
@@ -670,10 +670,10 @@ function exportMonthlyDetails() {
 
 /* ===== Centered Footer Card ===== */
 .footer-card{
-  margin: 60px auto 40px;
+  margin: 40px auto 28px;
   max-width: 1400px;
-  padding: 28px 20px;
-  border-radius: 22px;
+  padding: 22px 18px;
+  border-radius: 20px;
   text-align: center;
 
   background: rgba(255,255,255,0.7);

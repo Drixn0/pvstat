@@ -32,6 +32,13 @@ function setInputRef(day, instance) {
   else inputRefMap.delete(day)
 }
 
+function handleUnauthInputIntent(event) {
+  if (props.canManage) return
+  event?.preventDefault?.()
+  event?.stopPropagation?.()
+  props.requestAuth('登录后才能录入发电数据')
+}
+
 async function handleBlur(day) {
   if (!props.canManage) return
   const key = `${props.user.id}-${day}`
@@ -67,11 +74,37 @@ async function handleEnter(day) {
 <template>
   <div class="user-card" :style="userStyle">
     <div class="card-head">
-      <div class="who">
-        <div class="name">{{ user.name }}</div>
-        <div class="meta">
-          <span class="pill">功率 {{ fmtZero(user.capacity_kw, 2) }} kW</span>
-          <span class="pill">电价 {{ fmtZero(user.price_per_kwh, 2) }} 元/度</span>
+      <div class="head-left">
+        <div class="identity-card">
+          <div class="identity-main">
+            <div class="name-mark">{{ String(user.name || '?').slice(0, 1) }}</div>
+            <div class="identity">
+              <div class="eyebrow">{{ monthLabel }} 用户卡</div>
+              <div class="name">{{ user.name }}</div>
+              <div class="meta">
+                <span class="pill">功率 {{ fmtZero(user.capacity_kw, 2) }} kW</span>
+                <span class="pill">电价 {{ fmtZero(user.price_per_kwh, 2) }} 元/度</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="inline-stats">
+          <div class="mini-stat">
+            <span class="mini-label">月发电</span>
+            <strong>{{ getUserStats(user.id).monthTotalKwh.toFixed(2) }}</strong>
+            <span class="mini-unit">kWh</span>
+          </div>
+          <div class="mini-stat">
+            <span class="mini-label">每kW</span>
+            <strong>{{ getUserStats(user.id).monthEqHours.toFixed(2) }}</strong>
+            <span class="mini-unit">h</span>
+          </div>
+          <div class="mini-stat money">
+            <span class="mini-label">月收益</span>
+            <strong>¥{{ getUserStats(user.id).monthTotalAmount.toFixed(2) }}</strong>
+            <span class="mini-unit">estimate</span>
+          </div>
+        </div>
         </div>
       </div>
 
@@ -87,49 +120,58 @@ async function handleEnter(day) {
       </div>
     </div>
 
-    <div class="stats">
-      <div class="stat">
-        <div class="stat-label">{{ monthLabel }} 总发电量</div>
-        <div class="stat-value">{{ getUserStats(user.id).monthTotalKwh.toFixed(2) }} <span class="unit">kWh</span></div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">每kW发电量</div>
-        <div class="stat-value">{{ getUserStats(user.id).monthEqHours.toFixed(2) }}</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">{{ monthLabel }} 总收益</div>
-        <div class="stat-value money">¥{{ getUserStats(user.id).monthTotalAmount.toFixed(2) }}</div>
-      </div>
-    </div>
-
-    <div class="day-strip">
-      <div class="day-col day-col-head">
-        <div class="day-title">日</div>
-        <div class="row-title kwh">电量</div>
-        <div class="row-title perkw">每kW</div>
-        <div class="row-title amount">金额</div>
+    <div class="entry-shell">
+      <div class="entry-head">
+        <div class="entry-inline-title">{{ monthLabel }} 录入面板</div>
+        <div class="entry-inline-sub">填写上方电量，下面两行自动联动计算。</div>
       </div>
 
-      <div class="day-scroll" :ref="(el) => setScrollRef(user.id, el)">
-        <div class="day-col" v-for="d in daysInMonth" :key="user.id + '-' + d">
-          <div class="day-title">{{ Number(d) }}</div>
+      <div class="day-strip">
+        <div class="day-col day-col-head">
+          <div class="day-title">日</div>
+          <div class="cell-box head-cell-box">
+            <div class="cell-label head-cell-label">发电量</div>
+            <div class="head-placeholder">电量</div>
+          </div>
+          <div class="cell-metric head-cell-metric">
+            <span class="metric-label head-metric-label">每kW</span>
+          </div>
+          <div class="cell-metric head-cell-metric money">
+            <span class="metric-label head-metric-label">金额</span>
+          </div>
+        </div>
 
-          <el-input
-            :ref="(instance) => setInputRef(d, instance)"
-            v-model="user.days[d]"
-            size="small"
-            class="cell-input"
-            inputmode="decimal"
-            placeholder="0"
-            :readonly="!canManage"
-            :disabled="isPageBusy || isCellSaving(user.id, d)"
-            @focus="!canManage ? requestAuth('登录后才能录入发电数据') : null"
-            @blur="handleBlur(d)"
-            @keydown.enter.prevent="handleEnter(d)"
-          />
+        <div class="day-scroll" :ref="(el) => setScrollRef(user.id, el)">
+          <div class="day-col" v-for="d in daysInMonth" :key="user.id + '-' + d">
+            <div class="day-title">{{ Number(d) }}</div>
 
-          <div class="cell-text">{{ isCellSaving(user.id, d) ? '保存中...' : getPerKw(user, d).toFixed(3) }}</div>
-          <div class="cell-text money">¥{{ getAmount(user, d).toFixed(2) }}</div>
+            <div class="cell-box" :class="{ saving: isCellSaving(user.id, d) }">
+              <div class="cell-label">发电量</div>
+              <el-input
+                :ref="(instance) => setInputRef(d, instance)"
+                v-model="user.days[d]"
+                size="small"
+                class="cell-input"
+                inputmode="decimal"
+              placeholder="0"
+              :readonly="!canManage"
+              :disabled="isPageBusy || isCellSaving(user.id, d)"
+              @mousedown="handleUnauthInputIntent"
+              @focus="!canManage ? requestAuth('登录后才能录入发电数据') : null"
+              @blur="handleBlur(d)"
+              @keydown.enter.prevent="handleEnter(d)"
+            />
+            </div>
+
+            <div class="cell-metric">
+              <span class="metric-label">每kW</span>
+              <span class="metric-value">{{ isCellSaving(user.id, d) ? '保存中...' : getPerKw(user, d).toFixed(3) }}</span>
+            </div>
+            <div class="cell-metric money">
+              <span class="metric-label">金额</span>
+              <span class="metric-value">¥{{ getAmount(user, d).toFixed(2) }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -140,74 +182,167 @@ async function handleEnter(day) {
 
 <style scoped>
 .user-card{
-  border-radius: 18px;
-  padding: 14px;
-  box-shadow: 0 14px 34px rgba(15,23,42,.10);
+  border-radius: 22px;
+  padding: 12px;
+  box-shadow: 0 12px 28px rgba(15,23,42,.08);
 }
 
 .card-head{
   display:flex;
-  align-items:center;
+  align-items:stretch;
   justify-content: space-between;
-  gap: 16px;
-  flex-wrap: nowrap;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(255,255,255,.88), rgba(244,248,255,.82));
+  border: 1px solid rgba(15,23,42,.05);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.95);
 }
 
-.who{
-  display:flex;
-  align-items:center;
-  gap: 14px;
+.head-left{
   min-width: 0;
   flex: 1 1 auto;
 }
 
+.identity-card{
+  display:flex;
+  align-items:center;
+  gap: 14px;
+  height: 100%;
+  padding: 6px 4px;
+}
+
+.identity-main{
+  display:flex;
+  align-items:flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.name-mark{
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius: 18px;
+  font-size: 20px;
+  font-weight: 900;
+  color:#1d4ed8;
+  background: linear-gradient(135deg, rgba(255,255,255,.98), rgba(223,235,255,.96));
+  border: 1px solid rgba(78,111,196,.14);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.95);
+}
+
+.identity{
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.eyebrow{
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color:#6b7ea6;
+}
+
 .name{
-  font-size: 16px;
+  margin-top: 4px;
+  font-size: 18px;
   font-weight: 950;
   color:#0f172a;
-  white-space: nowrap;
-  flex: 0 0 auto;
+  line-height: 1.1;
 }
 
 .meta{
   display:flex;
   align-items:center;
-  gap:10px;
-  flex-wrap: nowrap;
+  gap:8px;
+  flex-wrap: wrap;
   min-width: 0;
-  overflow: hidden;
+  margin-top: 10px;
 }
 
 .pill{
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
   color:#0f172a;
   white-space: nowrap;
-  padding: 6px 10px;
+  padding: 5px 9px;
   border-radius: 999px;
-  background: rgba(255,255,255,.52);
+  background: rgba(255,255,255,.68);
   border: 1px solid rgba(15,23,42,.08);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.85),
-    0 10px 24px rgba(15,23,42,.10);
-  backdrop-filter: blur(10px) saturate(160%);
-  -webkit-backdrop-filter: blur(10px) saturate(160%);
+}
+
+.inline-stats{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: min(400px, 100%);
+  gap:8px;
+  padding-left: 12px;
+  border-left: 1px solid rgba(184,198,226,.34);
+}
+
+.mini-stat{
+  min-width: 0;
+  padding: 12px 12px 11px;
+  border-radius: 18px;
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(184,198,226,.30);
+  color:#0f172a;
+}
+
+.mini-stat.money strong{
+  color:#d33;
+}
+
+.mini-label{
+  display:block;
+  font-size: 11px;
+  font-weight: 700;
+  color:#64748b;
+}
+
+.mini-stat strong{
+  display:block;
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.1;
+}
+
+.mini-unit{
+  display:block;
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color:#7a8aa8;
+}
+
+.entry-inline-title{
+  font-size: 13px;
+  font-weight: 900;
+  color:#22314f;
+}
+
+.entry-inline-sub{
+  margin-top: 3px;
+  font-size: 11px;
+  color:#64748b;
 }
 
 .card-actions{
   display:flex;
   align-items:center;
-  gap: 10px;
-  flex-shrink: 0;
-  padding: 6px;
-  border-radius: 999px;
-  background: rgba(255,255,255,.55);
-  border: 1px solid rgba(15,23,42,.08);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.80),
-    0 14px 34px rgba(15,23,42,.14);
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  justify-content:flex-end;
+  flex: 0 0 auto;
+  gap: 8px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .icon-pill{
@@ -216,10 +351,10 @@ async function handleEnter(day) {
   gap: 6px;
   font-size: 12px;
   font-weight: 900;
-  padding: 8px 12px;
+  padding: 8px 11px;
   border-radius: 999px;
   border: 1px solid rgba(15,23,42,.10);
-  background: rgba(255,255,255,.70);
+  background: rgba(255,255,255,.88);
   box-shadow: none;
   cursor: pointer;
   transition: transform .15s ease, background .15s ease;
@@ -238,53 +373,46 @@ async function handleEnter(day) {
   background: rgba(254,242,242,.85);
 }
 
-.stats{
-  margin-top: 12px;
-  display:grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.entry-shell{
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,.72), rgba(245,248,255,.90));
+  border: 1px solid rgba(15,23,42,.05);
+}
+
+.entry-head{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
   gap: 10px;
+  margin-bottom: 10px;
+  padding: 0 2px;
 }
-
-.stat{
-  border: 1px solid rgba(15,23,42,.06);
-  background: rgba(255,255,255,.82);
-  border-radius: 14px;
-  padding: 10px 12px;
-  box-shadow: 0 8px 18px rgba(15,23,42,.06);
-}
-
-.stat-label{ font-size: 12px; color:#64748b; }
-.stat-value{ margin-top: 6px; font-size: 14px; font-weight: 900; color:#0f172a; }
-.stat-value.money{ color:#d33; }
 
 .day-strip{
-  margin-top: 12px;
   display:flex;
-  gap: 10px;
+  gap: 8px;
   align-items: stretch;
 }
 
 .day-col-head{
-  width: 110px;
-  flex: 0 0 110px;
+  width: 98px;
+  flex: 0 0 98px;
   border: 1px solid rgba(15,23,42,.06);
-  background: rgba(255,255,255,.85);
-  border-radius: 14px;
-  padding: 10px;
-  box-shadow: 0 8px 18px rgba(15,23,42,.06);
+  background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(249,251,255,.92));
+  border-radius: 16px;
+  padding: 9px 9px 9px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92);
 }
-
-.row-title{ font-size: 12px; color:#64748b; margin-top: 10px; }
-.row-title.kwh{ font-weight: 900; color:#334155; }
-.row-title.amount{ color:#d33; font-weight: 900; }
 
 .day-scroll{
   display:grid;
   grid-auto-flow: column;
-  grid-auto-columns: 108px;
-  gap: 10px;
+  grid-auto-columns: 92px;
+  gap: 8px;
   overflow-x: auto;
-  padding-bottom: 6px;
+  padding-bottom: 4px;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
 }
@@ -295,21 +423,60 @@ async function handleEnter(day) {
 
 .day-col{
   border: 1px solid rgba(15,23,42,.06);
-  background: rgba(255,255,255,.86);
-  border-radius: 14px;
-  padding: 10px 10px 12px;
-  box-shadow: 0 8px 18px rgba(15,23,42,.06);
+  background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(249,251,255,.92));
+  border-radius: 16px;
+  padding: 9px 9px 9px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92);
 }
 
-.day-title{ font-size: 12px; color:#64748b; font-weight: 900; }
+.day-title{ font-size: 11px; color:#64748b; font-weight: 900; }
 
-.cell-input{ margin-top: 8px; }
+.cell-box{
+  margin-top: 8px;
+  padding: 6px 7px 7px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(241,245,255,.94), rgba(255,255,255,.92));
+  border: 1px solid rgba(184,198,226,.35);
+}
+
+.cell-box.saving{
+  background: linear-gradient(180deg, rgba(232,242,255,.96), rgba(255,255,255,.94));
+  border-color: rgba(59,130,246,.22);
+}
+
+.cell-label{
+  margin-bottom: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  color:#6d7f9c;
+  line-height: 1.1;
+}
+
+.head-cell-box{
+  align-items:flex-start;
+}
+
+.head-cell-label{
+  color:#6d7f9c;
+}
+
+.head-placeholder{
+  min-height: 32px;
+  display:flex;
+  align-items:center;
+  font-size: 11px;
+  font-weight: 900;
+  color:#334155;
+  white-space: nowrap;
+}
+
+.cell-input{ margin-top: 0; }
 .cell-input :deep(.el-input__wrapper){
   border-radius: 12px;
-  background: rgba(15,23,42,.04);
+  background: rgba(255,255,255,.96);
   box-shadow: none;
-  padding: 0 10px;
-  border: 1px solid rgba(15,23,42,.06);
+  padding: 0 8px;
+  border: 1px solid rgba(184,198,226,.35);
 }
 
 .cell-input :deep(input){
@@ -318,25 +485,91 @@ async function handleEnter(day) {
   color:#0f172a;
 }
 
-.cell-text{
-  margin-top: 10px;
-  text-align: right;
-  font-size: 12px;
-  font-weight: 900;
-  color:#0f172a;
+.cell-metric{
+  margin-top: 5px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 6px;
+  padding: 5px 7px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.74);
+  min-height: 34px;
 }
 
-.cell-text.money{ color:#d33; }
-.hint{ margin-top: 10px; font-size: 12px; color:#64748b; }
-.unit{ font-size: 12px; color:#64748b; font-weight:700; margin-left:4px; }
+.metric-label{
+  font-size: 10px;
+  font-weight: 800;
+  color:#7a8aa8;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.metric-value{
+  text-align: right;
+  font-size: 11px;
+  font-weight: 900;
+  color:#0f172a;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.cell-metric.money .metric-value{ color:#d33; }
+.head-cell-metric{
+  justify-content:flex-start;
+}
+
+.head-metric-label{
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.head-cell-metric.money .head-metric-label{
+  color:#ef4444;
+}
+.hint{ margin-top: 8px; font-size: 11px; color:#64748b; }
+.unit{ font-size: 11px; color:#64748b; font-weight:700; margin-left:4px; }
 
 @media (max-width: 1200px){
-  .stats{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card-head{
+    flex-direction: column;
+  }
+
+  .identity-card{
+    flex-direction: column;
+    align-items:flex-start;
+  }
+
+  .inline-stats{
+    width: 100%;
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid rgba(184,198,226,.38);
+    padding-top: 12px;
+  }
 }
 
 @media (max-width: 820px){
-  .card-head{ flex-wrap: wrap; align-items:flex-start; }
-  .meta{ flex-wrap: wrap; }
-  .card-actions{ width: 100%; justify-content: flex-end; }
+  .identity-card{
+    align-items:flex-start;
+  }
+
+  .identity-main{
+    width: 100%;
+  }
+
+  .inline-stats{
+    grid-template-columns: 1fr;
+  }
+
+  .entry-head{
+    flex-direction: column;
+    align-items:flex-start;
+  }
+
+  .card-actions{
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 </style>

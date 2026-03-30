@@ -7,6 +7,8 @@ const loading = ref(false)
 const ready = ref(false)
 const dialogVisible = ref(false)
 const promptMessage = ref('登录后才能继续操作')
+let lastOpenAt = 0
+let lastOpenMessage = ''
 const form = reactive({
   username: 'admin',
   password: ''
@@ -65,7 +67,17 @@ function logout() {
 }
 
 function openLoginDialog(message = '登录后才能继续操作') {
+  const now = Date.now()
+  if (dialogVisible.value && lastOpenMessage === message && now - lastOpenAt < 800) {
+    return
+  }
+  if (!dialogVisible.value && lastOpenMessage === message && now - lastOpenAt < 800) {
+    return
+  }
   promptMessage.value = message
+  lastOpenAt = now
+  lastOpenMessage = message
+  if (dialogVisible.value) return
   dialogVisible.value = true
 }
 
