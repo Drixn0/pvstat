@@ -3,6 +3,8 @@ import cors from 'cors'
 import Database from 'better-sqlite3'
 import { fileURLToPath } from 'node:url'
 
+const APP_VERSION = process.env.APP_VERSION || '2.0.0'
+
 class HttpError extends Error {
   constructor(status, message) {
     super(message)
@@ -92,9 +94,15 @@ export function initSchema(db) {
 
 export function createApp(options = {}) {
   const dbPath = options.dbPath ?? process.env.DB_PATH ?? 'pv.db'
+  const allowedOrigin = options.allowedOrigin ?? process.env.ALLOWED_ORIGIN ?? '*'
+  const enableDbHealthcheck = (options.enableDbHealthcheck ?? process.env.HEALTHCHECK_DB ?? 'true') !== 'false'
   const app = express()
 
-  app.use(cors())
+  app.disable('x-powered-by')
+  app.set('trust proxy', true)
+  app.use(cors({
+    origin: allowedOrigin === '*' ? true : allowedOrigin
+  }))
   app.use(express.json())
 
   const db = new Database(dbPath)
@@ -159,24 +167,49 @@ export function createApp(options = {}) {
     let dbOk = true
     let dbErr = null
 
-    try {
-      db.prepare('SELECT 1 AS ok').get()
-    } catch (error) {
-      dbOk = false
-      dbErr = String(error?.message || error)
+    if (enableDbHealthcheck) {
+      try {
+        db.prepare('SELECT 1 AS ok').get()
+      } catch (error) {
+        dbOk = false
+        dbErr = String(error?.message || error)
+      }
     }
 
     res.json({
-      ok: dbOk,
+      ok: enableDbHealthcheck ? dbOk : true,
+      status: enableDbHealthcheck ? (dbOk ? 'ok' : 'degraded') : 'ok',
       service: 'pv-stat-server',
-      version: '2.0.0',
+      version: APP_VERSION,
       uptimeSec: Math.floor((Date.now() - startedAt) / 1000),
       time: Date.now(),
+      env: process.env.NODE_ENV || 'development',
       checks: {
-        db: dbOk,
+        db: enableDbHealthcheck ? dbOk : 'skipped',
         dbError: dbErr
+      },
+      config: {
+        dbHealthcheck: enableDbHealthcheck,
+        allowedOrigin
       }
     })
+  }))
+
+  app.get('/ready', route((req, res) => {
+    try {
+      db.prepare('SELECT 1 AS ok').get()
+      res.json({
+        success: true,
+        status: 'ready',
+        version: APP_VERSION
+      })
+    } catch (error) {
+      res.status(503).json({
+        success: false,
+        status: 'not_ready',
+        error: String(error?.message || error)
+      })
+    }
   }))
 
   app.get('/households', route((req, res) => {

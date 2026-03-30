@@ -111,10 +111,25 @@ SQLite 数据已挂载到 Docker volume：
 
 容器重建后，数据库内容会保留。
 
+### 可选环境变量
+
+后端支持以下环境变量：
+
+- `PORT`: 服务监听端口，默认 `3000`
+- `DB_PATH`: SQLite 数据库路径，默认 `pv.db`
+- `APP_VERSION`: 健康检查返回的版本号
+- `HEALTHCHECK_DB`: 是否执行数据库健康检查，默认 `true`
+- `ALLOWED_ORIGIN`: CORS 允许来源，默认 `*`
+
+参考示例：
+
+- [.env.example](/Users/drixn/Dev/pvstat/.env.example)
+
 ### 生产部署结构
 
 - `web` 容器：使用 `nginx` 提供静态页面，并代理 `/api` 与 `/health`
 - `server` 容器：运行 Express + SQLite 服务
+- `server` 与 `web` 均已配置容器级健康检查
 
 ### 相关文件
 
@@ -122,6 +137,7 @@ SQLite 数据已挂载到 Docker volume：
 - [server/Dockerfile](/Users/drixn/Dev/pvstat/server/Dockerfile)
 - [web/Dockerfile](/Users/drixn/Dev/pvstat/web/Dockerfile)
 - [web/nginx.conf](/Users/drixn/Dev/pvstat/web/nginx.conf)
+- [.env.example](/Users/drixn/Dev/pvstat/.env.example)
 
 ## 构建与预览
 
