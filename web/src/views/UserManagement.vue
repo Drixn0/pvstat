@@ -1,17 +1,20 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElDialog, ElMessage, ElMessageBox } from 'element-plus'
 import { deleteHousehold, fetchHouseholdHistorySummary, fetchHouseholds } from '../api/pvstat'
 import UserFormDialog from '../components/UserFormDialog.vue'
 import { useHouseholdManagement } from '../composables/useHouseholdManagement'
 
+const route = useRoute()
+const router = useRouter()
 const households = ref([])
 const loading = ref(false)
 const loadError = ref('')
-const keyword = ref('')
-const sortKey = ref('name-asc')
-const pageSize = ref(6)
-const currentPage = ref(1)
+const keyword = ref(String(route.query.keyword || ''))
+const sortKey = ref(String(route.query.sort || 'name-asc'))
+const pageSize = ref([4, 6, 8, 12].includes(Number(route.query.page_size)) ? Number(route.query.page_size) : 6)
+const currentPage = ref(Math.max(1, Number(route.query.page || 1) || 1))
 const selectedIds = ref([])
 const bulkDeleting = ref(false)
 const historyDialogVisible = ref(false)
@@ -240,6 +243,21 @@ function closeHistory() {
 onMounted(() => {
   loadAll()
 })
+
+watch(sortedHouseholds, () => {
+  normalizePage()
+}, { flush: 'post' })
+
+watch([keyword, sortKey, pageSize, currentPage], async () => {
+  const query = {
+    ...route.query,
+    keyword: keyword.value || undefined,
+    sort: sortKey.value !== 'name-asc' ? sortKey.value : undefined,
+    page_size: pageSize.value !== 6 ? String(pageSize.value) : undefined,
+    page: currentPage.value > 1 ? String(currentPage.value) : undefined
+  }
+  await router.replace({ query })
+}, { flush: 'post' })
 </script>
 
 <template>

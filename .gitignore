@@ -23,3 +23,6 @@ vite/
 .env
 
 pv.db
+server/pv.db
+server/pv.db-wal
+server/pv.db-shm
