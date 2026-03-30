@@ -26,6 +26,14 @@
           <div class="title-left">
             <div class="title-text">太阳能光伏发电统计系统</div>
             <div class="title-sub">自动计算电量 / 每kW / 金额</div>
+            <nav class="top-nav" aria-label="主导航">
+              <router-link class="nav-link" :class="{ active: route.name === 'dashboard' }" to="/">
+                发电录入
+              </router-link>
+              <router-link class="nav-link" :class="{ active: route.name === 'users' }" to="/users">
+                用户管理
+              </router-link>
+            </nav>
           </div>
 
           <!-- 监控小组件 -->
@@ -130,6 +138,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElConfigProvider } from 'element-plus'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 
@@ -142,6 +151,7 @@ const latencyMs = ref(null)
 const lastCheckedAt = ref(null)
 const failStreak = ref(0)
 const health = ref(null)
+const route = useRoute()
 
 const showPopover = ref(false)
 
@@ -473,6 +483,42 @@ onUnmounted(() => {
   text-overflow: ellipsis;
 }
 
+.top-nav{
+  margin-top: 12px;
+  display:flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.nav-link{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width: 96px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  text-decoration:none;
+  font-size: 13px;
+  font-weight: 900;
+  color: #334155;
+  background: rgba(255,255,255,.68);
+  border: 1px solid rgba(15,23,42,.08);
+  box-shadow: 0 8px 18px rgba(15,23,42,.06);
+  transition: transform .15s ease, box-shadow .15s ease, color .15s ease, background .15s ease;
+}
+
+.nav-link:hover{
+  transform: translateY(-1px);
+}
+
+.nav-link.active{
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  box-shadow: 0 12px 26px rgba(99,102,241,.22);
+}
+
 .monitor{
   position: relative;
   z-index: 2;
@@ -522,7 +568,7 @@ onUnmounted(() => {
 }
 
 .pop-title{ display:flex; align-items:center; justify-content: space-between; gap: 10px; padding: 6px 6px 10px; border-bottom: 1px solid rgba(15,23,42,.06); margin-bottom: 10px; font-weight: 1000; color: rgba(15,23,42,.85); }
-.pop-btn{ border: 1px solid rgba(15,23,42,.10); background: rgba(255,255,255,.75); border-radius: 12px; padding: 8px 10px; font-weight: 1000; cursor: pointer; }
+.pop-btn{ border: 1px solid rgba(15,23,42,.10); background: rgba(255,255,255,.75); border-radius: 999px; padding: 8px 10px; font-weight: 1000; cursor: pointer; }
 .pop-btn:disabled{ opacity: .6; cursor: not-allowed; }
 
 .pop-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -538,7 +584,7 @@ onUnmounted(() => {
 .pop-foot{ margin-top: 10px; border-top: 1px solid rgba(15,23,42,.06); padding-top: 10px; }
 .note{ font-size: 12px; color: rgba(15,23,42,.55); font-weight: 800; line-height: 1.4; }
 .foot-actions{ margin-top: 10px; display:flex; justify-content:flex-end; }
-.ghost{ border: 1px solid rgba(15,23,42,.10); background: transparent; border-radius: 12px; padding: 8px 12px; font-weight: 1000; cursor: pointer; }
+.ghost{ border: 1px solid rgba(15,23,42,.10); background: transparent; border-radius: 999px; padding: 8px 12px; font-weight: 1000; cursor: pointer; }
 
 .fade-up-enter-active, .fade-up-leave-active{ transition: all .18s ease; }
 .fade-up-enter-from, .fade-up-leave-to{ opacity: 0; transform: translateY(-6px); }

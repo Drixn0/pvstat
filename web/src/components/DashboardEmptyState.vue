@@ -199,7 +199,7 @@ defineEmits(['primary', 'secondary'])
 .timeline-cards span:nth-child(3){ width: 136px; }
 
 .ios-btn{
-  border-radius: 12px;
+  border-radius: 999px;
   border: 1px solid rgba(15,23,42,.10);
   background: rgba(255,255,255,.78);
   box-shadow: 0 6px 16px rgba(15,23,42,.06);

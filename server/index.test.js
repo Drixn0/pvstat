@@ -112,3 +112,68 @@ test('health endpoint reflects runtime config options', async () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   }
 })
+
+test('household history summary aggregates monthly generation', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvstat-test-'))
+  const dbPath = path.join(tmpDir, 'test.db')
+  const svc = createApp({ dbPath })
+
+  try {
+    svc.db.prepare(`
+      INSERT INTO households (name, capacity_kw, price_per_kwh)
+      VALUES (?, ?, ?)
+    `).run('李四', 8.8, 1.2)
+
+    const householdId = svc.db.prepare('SELECT id FROM households WHERE name = ?').get('李四').id
+    const insertGeneration = svc.db.prepare(`
+      INSERT INTO generation (household_id, date, kwh)
+      VALUES (?, ?, ?)
+    `)
+
+    insertGeneration.run(householdId, '2026-01-02', 10)
+    insertGeneration.run(householdId, '2026-01-03', 14)
+    insertGeneration.run(householdId, '2026-02-10', 20)
+
+    const req = { method: 'GET', url: `/households/${householdId}/history-summary`, headers: {}, params: { id: String(householdId) } }
+    const res = {
+      statusCode: 200,
+      headers: {},
+      body: '',
+      setHeader(name, value) {
+        this.headers[name] = value
+      },
+      getHeader(name) {
+        return this.headers[name]
+      },
+      status(code) {
+        this.statusCode = code
+        return this
+      },
+      json(payload) {
+        this.body = payload
+        return this
+      }
+    }
+
+    await new Promise((resolve, reject) => {
+      svc.app.handle(req, res, (error) => {
+        if (error) reject(error)
+        else resolve()
+      })
+      if (res.body) resolve()
+    })
+
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.body.household.name, '李四')
+    assert.equal(res.body.totals.months, 2)
+    assert.equal(res.body.totals.totalKwh, 44)
+    assert.equal(res.body.totals.estimatedAmount, 52.8)
+    assert.equal(res.body.months[0].month, '2026-02')
+    assert.equal(res.body.months[0].filledDays, 1)
+    assert.equal(res.body.months[1].month, '2026-01')
+    assert.equal(res.body.months[1].totalKwh, 24)
+  } finally {
+    svc.close()
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+})

@@ -156,6 +156,24 @@ export function createApp(options = {}) {
     FROM generation
     WHERE substr(date, 1, 7) = ?
   `)
+  const householdByIdStmt = db.prepare(`
+    SELECT id, name, capacity_kw, price_per_kwh
+    FROM households
+    WHERE id = ?
+  `)
+  const householdHistorySummaryStmt = db.prepare(`
+    SELECT
+      substr(date, 1, 7) AS month,
+      COUNT(*) AS filled_days,
+      COALESCE(SUM(kwh), 0) AS total_kwh,
+      COALESCE(AVG(kwh), 0) AS avg_daily_kwh,
+      MIN(date) AS first_date,
+      MAX(date) AS last_date
+    FROM generation
+    WHERE household_id = ?
+    GROUP BY substr(date, 1, 7)
+    ORDER BY month DESC
+  `)
 
   const deleteHouseholdCascade = db.transaction((householdId) => {
     return deleteHouseholdStmt.run(householdId)
@@ -286,6 +304,41 @@ export function createApp(options = {}) {
     const month = requireMonth(req.query.month)
     const rows = monthGenerationStmt.all(month)
     res.json(rows)
+  }))
+
+  app.get('/households/:id/history-summary', route((req, res) => {
+    const householdId = requireExistingHousehold(req.params.id)
+    const household = householdByIdStmt.get(householdId)
+    const rows = householdHistorySummaryStmt.all(householdId)
+    const pricePerKwh = Number(household.price_per_kwh) || 0
+    const months = rows.map((row) => {
+      const totalKwh = Number(row.total_kwh) || 0
+      return {
+        month: row.month,
+        filledDays: Number(row.filled_days) || 0,
+        totalKwh,
+        avgDailyKwh: Number(row.avg_daily_kwh) || 0,
+        estimatedAmount: totalKwh * pricePerKwh,
+        firstDate: row.first_date,
+        lastDate: row.last_date
+      }
+    })
+    const totalKwh = months.reduce((sum, item) => sum + item.totalKwh, 0)
+
+    res.json({
+      household: {
+        id: household.id,
+        name: household.name,
+        capacityKw: Number(household.capacity_kw) || 0,
+        pricePerKwh
+      },
+      totals: {
+        months: months.length,
+        totalKwh,
+        estimatedAmount: totalKwh * pricePerKwh
+      },
+      months
+    })
   }))
 
   app.delete('/households/:id', route((req, res) => {

@@ -20,6 +20,11 @@ export async function deleteHousehold(id) {
   return data
 }
 
+export async function fetchHouseholdHistorySummary(id) {
+  const { data } = await apiClient.get(`/households/${id}/history-summary`)
+  return data
+}
+
 export async function fetchGenerationByMonth(month) {
   const { data } = await apiClient.get('/generation', {
     params: { month }
